@@ -5,28 +5,44 @@ window.state = {
   isInitialized: false
 };
 
-// Configurações do Repositório GitHub
+// ⚙️ Configurações do Repositório GitHub
 const REPO_OWNER = 'marcosangelo83-coder';
 const REPO_NAME = 'Relatorio';
 const FILE_PATH = 'demandas.json';
 const GITHUB_TOKEN = ''; 
 
-// URL do arquivo de dados público
-const GITHUB_DATA_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${FILE_PATH}`;
-
-/* --- SINCRONIZAÇÃO AUTOMÁTICA VIA GITHUB --- */
+/* --- 🔑 SINCRONIZAÇÃO AUTOMÁTICA VIA GITHUB (REPOSITÓRIO PRIVADO) --- */
 async function loadDataFromGithub() {
+  let token = GITHUB_TOKEN;
+
+  // Solicita o token Personal Access Token se não estiver salvo no arquivo
+  if (!token || token === 'COLE_SEU_TOKEN_GHP_AQUI') {
+    token = prompt("Seu repositório é privado. Insira seu Personal Access Token do GitHub para ler os dados:");
+    if (!token) {
+      updateSyncStatus('error', 'Token não fornecido');
+      return;
+    }
+  }
+
   updateSyncStatus('loading', 'Sincronizando dados com o GitHub...');
+  
+  // Utiliza a API do GitHub com autenticação para repositórios privados
+  const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
+
   try {
-    const urlWithCacheBuster = `${GITHUB_DATA_URL}?t=${new Date().getTime()}`;
-    const response = await fetch(urlWithCacheBuster);
+    const response = await fetch(apiUrl, {
+      headers: { 
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github.v3.raw'
+      }
+    });
 
     if (!response.ok) {
       throw new Error(`Erro na conexão (${response.status}: ${response.statusText})`);
     }
 
     let jsonRecords = [];
-    const isExcel = GITHUB_DATA_URL.toLowerCase().includes('.xlsx') || GITHUB_DATA_URL.toLowerCase().includes('.xls');
+    const isExcel = FILE_PATH.toLowerCase().endsWith('.xlsx') || FILE_PATH.toLowerCase().endsWith('.xls');
 
     if (isExcel) {
       const arrayBuffer = await response.arrayBuffer();
@@ -39,6 +55,7 @@ async function loadDataFromGithub() {
     }
 
     if (Array.isArray(jsonRecords) && jsonRecords.length > 0) {
+      // Substitui completamente os dados anteriores
       initData(jsonRecords);
       const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       updateSyncStatus('success', `Atualizado via GitHub (${hora})`);
@@ -51,7 +68,7 @@ async function loadDataFromGithub() {
   }
 }
 
-/* --- SALVAR ALTERAÇÕES DIRETAMENTE NO GITHUB --- */
+/* --- 💾 SALVAR ALTERAÇÕES DIRETAMENTE NO GITHUB --- */
 async function saveToGithub() {
   let token = GITHUB_TOKEN;
 
@@ -67,7 +84,7 @@ async function saveToGithub() {
   const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
 
   try {
-    // 1. Obter o SHA do arquivo atual
+    // 1. Obter o SHA do arquivo atual no repositório
     const getFileResponse = await fetch(apiUrl, {
       headers: { 'Authorization': `token ${token}` }
     });
@@ -78,7 +95,7 @@ async function saveToGithub() {
       sha = fileData.sha;
     }
 
-    // 2. Limpar metadados e preparar o JSON
+    // 2. Limpar metadados e preparar o JSON completo para substituição
     const cleanData = window.state.rawData.map(row => {
       const copy = { ...row };
       delete copy.__id;
@@ -88,7 +105,7 @@ async function saveToGithub() {
     const jsonString = JSON.stringify(cleanData, null, 2);
     const contentBase64 = btoa(unescape(encodeURIComponent(jsonString)));
 
-    // 3. Enviar requisição PUT para salvar no repositório
+    // 3. Enviar requisição PUT para sobrescrever o arquivo no repositório
     const putResponse = await fetch(apiUrl, {
       method: 'PUT',
       headers: {
@@ -116,7 +133,7 @@ async function saveToGithub() {
   }
 }
 
-/* --- FUNÇÕES UTILITÁRIAS --- */
+/* --- 🛠️ FUNÇÕES UTILITÁRIAS --- */
 function parseCurrency(val) {
   if (val === null || val === undefined || val === '') return 0;
   if (typeof val === 'number') return isNaN(val) ? 0 : val;
@@ -152,7 +169,7 @@ function updateSyncStatus(type, message) {
   statusEl.innerHTML = `<i class="${icons[type] || icons.idle} text-[11px]"></i> ${message}`;
 }
 
-/* --- UPLOAD LOCAL --- */
+/* --- 📄 UPLOAD LOCAL --- */
 function handleFileUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -200,10 +217,11 @@ function handleFileUpload(event) {
   }
 }
 
-/* --- INICIALIZAÇÃO DE DADOS --- */
+/* --- 🔄 INICIALIZAÇÃO E SUBSTITUIÇÃO DE DADOS --- */
 function initData(jsonRecords) {
   if (!Array.isArray(jsonRecords) || jsonRecords.length === 0) return;
 
+  // Substitui completamente o estado anterior pelos novos dados importados
   window.state.rawData = jsonRecords.map((row, index) => ({
     ...row,
     __id: index,
@@ -221,7 +239,7 @@ function notifyStateChange() {
   renderAnalyticalTable();
 }
 
-/* --- FILTROS --- */
+/* --- 🔍 FILTROS --- */
 function populateSelectOptions() {
   const filterFields = [
     { id: 'filterUnidade', key: 'Unidade' },
@@ -289,7 +307,7 @@ function resetFilters() {
   applyFilters();
 }
 
-/* --- RENDERIZAÇÃO DE PAINÉIS E TABELAS --- */
+/* --- 📊 RENDERIZAÇÃO DE PAINÉIS E TABELAS --- */
 function renderKPIs() {
   const totalRecords = window.state.filteredData.length;
   const totalValue = window.state.filteredData.reduce((acc, row) => acc + (row['Valor Estimado'] || 0), 0);
@@ -423,7 +441,7 @@ function renderAnalyticalTable() {
   `;
 }
 
-/* --- EXPORTAÇÃO EXCEL --- */
+/* --- 📤 EXPORTAÇÃO EXCEL --- */
 function exportToExcel() {
   if (!window.state.filteredData || window.state.filteredData.length === 0) {
     alert("Não há dados para exportar.");
@@ -443,7 +461,7 @@ function exportToExcel() {
   XLSX.writeFile(workbook, `Demandas_SEGES_2026_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-/* --- INICIALIZAÇÃO NA CARGA DA PÁGINA --- */
+/* --- 🚀 INICIALIZAÇÃO NA CARGA DA PÁGINA --- */
 document.addEventListener('DOMContentLoaded', () => {
   loadDataFromGithub();
 });
