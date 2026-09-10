@@ -5,8 +5,14 @@ window.state = {
   isInitialized: false
 };
 
-// URL do arquivo de dados no seu repositório GitHub
-const GITHUB_DATA_URL = 'https://raw.githubusercontent.com/marcosangelo83-coder/Relatorio/main/demandas.json';
+// Configurações do Repositório GitHub
+const REPO_OWNER = 'marcosangelo83-coder';
+const REPO_NAME = 'Relatorio';
+const FILE_PATH = 'demandas.json';
+const GITHUB_TOKEN = ''; 
+
+// URL do arquivo de dados público
+const GITHUB_DATA_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${FILE_PATH}`;
 
 /* --- SINCRONIZAÇÃO AUTOMÁTICA VIA GITHUB --- */
 async function loadDataFromGithub() {
@@ -42,6 +48,71 @@ async function loadDataFromGithub() {
   } catch (err) {
     console.error("Falha ao sincronizar com GitHub:", err);
     updateSyncStatus('error', 'Falha ao buscar dados do GitHub');
+  }
+}
+
+/* --- SALVAR ALTERAÇÕES DIRETAMENTE NO GITHUB --- */
+async function saveToGithub() {
+  let token = GITHUB_TOKEN;
+
+  if (!token || token === 'COLE_SEU_TOKEN_GHP_AQUI') {
+    token = prompt("Insira seu Personal Access Token do GitHub para salvar:");
+    if (!token) {
+      alert("Operação cancelada: Token não fornecido.");
+      return;
+    }
+  }
+
+  updateSyncStatus('loading', 'Enviando alterações para o GitHub...');
+  const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
+
+  try {
+    // 1. Obter o SHA do arquivo atual
+    const getFileResponse = await fetch(apiUrl, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+
+    let sha = '';
+    if (getFileResponse.ok) {
+      const fileData = await getFileResponse.json();
+      sha = fileData.sha;
+    }
+
+    // 2. Limpar metadados e preparar o JSON
+    const cleanData = window.state.rawData.map(row => {
+      const copy = { ...row };
+      delete copy.__id;
+      return copy;
+    });
+
+    const jsonString = JSON.stringify(cleanData, null, 2);
+    const contentBase64 = btoa(unescape(encodeURIComponent(jsonString)));
+
+    // 3. Enviar requisição PUT para salvar no repositório
+    const putResponse = await fetch(apiUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: 'Atualização realizada via Painel Web SEGES',
+        content: contentBase64,
+        sha: sha
+      })
+    });
+
+    if (putResponse.ok) {
+      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      updateSyncStatus('success', `Salvo no GitHub (${hora})`);
+      alert('Dados salvos com sucesso diretamente no seu repositório GitHub!');
+    } else {
+      throw new Error(`Erro na API (${putResponse.status})`);
+    }
+  } catch (error) {
+    console.error('Erro ao salvar no GitHub:', error);
+    updateSyncStatus('error', 'Falha ao salvar no GitHub');
+    alert('Erro ao salvar no GitHub. Verifique as permissões do seu token.');
   }
 }
 
