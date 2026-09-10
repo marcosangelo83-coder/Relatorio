@@ -32,19 +32,12 @@
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <!-- BOTÃO RECARREGAR DO GITHUB -->
-        <button onclick="loadDataFromGithub()"
-          class="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-2 border border-blue-200 shadow-sm">
-          <i class="fa-solid fa-rotate text-blue-600"></i>
-          <span>Atualizar do GitHub</span>
-        </button>
-        <!-- BOTÃO IMPORTAR MANUAL (LOCAL) -->
-        <input type="file" id="fileInput" accept=".xlsx, .xls, .csv, .json" class="hidden"
-          onchange="handleFileUpload(event)">
+        <!-- BOTÃO IMPORTAR DADOS (SUBSTITUI O BOTÃO ATUALIZAR INFORMAÇÃO) -->
+        <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
         <button onclick="document.getElementById('fileInput').click()"
-          class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg transition-colors flex items-center gap-2 border border-gray-300 shadow-sm">
-          <i class="fa-solid fa-file-import text-gray-600"></i>
-          <span>Importar Local</span>
+          class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg transition-colors flex items-center gap-2 shadow-sm">
+          <i class="fa-solid fa-file-import"></i>
+          <span>Importar Dados</span>
         </button>
         <!-- BOTÃO LIMPAR FILTRO -->
         <button id="btnClearFilters" onclick="resetFilters()"
@@ -145,7 +138,7 @@
       </div>
     </section>
 
-    <!-- TABELA SINTÉTICA -->
+    <!-- TABELA SINTÉTICA (Resumo Consolidado) -->
     <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div class="p-5 border-b border-gray-200 bg-slate-50 flex items-center justify-between">
         <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
@@ -175,7 +168,7 @@
       </div>
     </section>
 
-    <!-- TABELA ANALÍTICA -->
+    <!-- TABELA ANALÍTICA (Detalhamento) -->
     <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div class="p-5 border-b border-gray-200 bg-slate-50 flex items-center justify-between">
         <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
@@ -212,7 +205,9 @@
 
   </div>
 
-  <!-- JavaScript com Integração Nativa do GitHub -->
+  <!-- ========================================================================== -->
+  <!-- BLOCO JavaScript Completo - Atualizado para Leitura Local sem Erros CORS   -->
+  <!-- ========================================================================== -->
   <script>
     window.state = {
       rawData: [],
@@ -221,53 +216,62 @@
       isInitialized: false
     };
 
-    /* 
-      ATENÇÃO: Cole abaixo o link RAW do seu arquivo no GitHub.
-      Exemplo: 'https://raw.githubusercontent.com/SEU_USUARIO/SEU_REPOSITORIO/main/demandas.json'
-    */
-    const GITHUB_DATA_URL = 'https://raw.githubusercontent.com/marcosangelo83-coder/Relatorio/main/demandas.json';
-
-    /* --- SINCRONIZAÇÃO AUTOMÁTICA VIA GITHUB --- */
-    async function loadDataFromGithub() {
-      updateSyncStatus('loading', 'Sincronizando dados com o GitHub...');
-      try {
-        if (GITHUB_DATA_URL.includes('SEU_USUARIO')) {
-          throw new Error('URL do GitHub ainda não foi configurada no script.');
-        }
-
-        // Adiciona timestamp para evitar cache do navegador
-        const urlWithCacheBuster = `${GITHUB_DATA_URL}?t=${new Date().getTime()}`;
-        const response = await fetch(urlWithCacheBuster);
-
-        if (!response.ok) {
-          throw new Error(`Erro na conexão (${response.status}: ${response.statusText})`);
-        }
-
-        let jsonRecords = [];
-        const isExcel = GITHUB_DATA_URL.toLowerCase().includes('.xlsx') || GITHUB_DATA_URL.toLowerCase().includes('.xls');
-
-        if (isExcel) {
-          const arrayBuffer = await response.arrayBuffer();
-          const workbook = XLSX.read(new Uint8Array(arrayBuffer), {type: 'array'});
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-          jsonRecords = XLSX.utils.sheet_to_json(worksheet);
-        } else {
-          jsonRecords = await response.json();
-        }
-
-        if (Array.isArray(jsonRecords) && jsonRecords.length > 0) {
-          initData(jsonRecords);
-          const hora = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
-          updateSyncStatus('success', `Atualizado via GitHub (${hora})`);
-        } else {
-          throw new Error('Arquivo no GitHub não possui registros válidos.');
-        }
-      } catch (err) {
-        console.error("Falha ao sincronizar com GitHub:", err);
-        updateSyncStatus('error', 'Falha ao buscar dados do GitHub');
-      }
-    }
+    /* Base de dados fallback (embarcada) */
+    window.EMBEDDED_DEMANDAS = [
+      {"Ano Orçamento": "2026", "Unidade": "CENTRAL", "Área": "", "Status / Orçamento": "A empenhar", "Valor Estimado": 240000.0, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "MobGov 2.0", "Categoria Econômica": "Despesas Correntes", "Contratação": "Não se aplica", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "", "Status / Orçamento": "Em elaboração", "Valor Estimado": 1215055.0, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "Integração artefatos digitais, modelos e pareceres", "Categoria Econômica": "", "Contratação": "", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "CCGES", "Status / Orçamento": "A empenhar", "Valor Estimado": 0.0, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": " Compras.gov", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "CGCON", "Status / Orçamento": "A empenhar", "Valor Estimado": 4500000.0, "Cód. Demanda (Siged / clarity)": "4475108", "Objeto/Sistema": "PATRIM", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "CGCON", "Status / Orçamento": "A empenhar", "Valor Estimado": 784000.0, "Cód. Demanda (Siged / clarity)": "4546212\n4546239\n4546137\n4545985", "Objeto/Sistema": "Doações.gov.br", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "CGCOP", "Status / Orçamento": "A empenhar", "Valor Estimado": 1944088.0, "Cód. Demanda (Siged / clarity)": "4532173", "Objeto/Sistema": "APP COMPRAS", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "CGCOP", "Status / Orçamento": "A empenhar", "Valor Estimado": 895768.0, "Cód. Demanda (Siged / clarity)": "4546792", "Objeto/Sistema": "Compras.gov - CONSULTA PÚBLICA", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "CGCOP", "Status / Orçamento": "A empenhar", "Valor Estimado": 48602.2, "Cód. Demanda (Siged / clarity)": "4854172", "Objeto/Sistema": "Fase Interna", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "CGCOP", "Status / Orçamento": "A empenhar", "Valor Estimado": 103352.57, "Cód. Demanda (Siged / clarity)": "5028679", "Objeto/Sistema": "", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "CGCOP", "Status / Orçamento": "A empenhar", "Valor Estimado": 48602.2, "Cód. Demanda (Siged / clarity)": "5040583", "Objeto/Sistema": "", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "CGCOP", "Status / Orçamento": "A empenhar", "Valor Estimado": 534624.2, "Cód. Demanda (Siged / clarity)": "5042537", "Objeto/Sistema": "Fase Externa", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "CGCOP", "Status / Orçamento": "A empenhar", "Valor Estimado": 1458066.0, "Cód. Demanda (Siged / clarity)": "5043489", "Objeto/Sistema": "", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "CGGES", "Status / Orçamento": "A empenhar", "Valor Estimado": 486022.0, "Cód. Demanda (Siged / clarity)": "5040624", "Objeto/Sistema": " Compras.gov", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG - CGCON", "Status / Orçamento": "A empenhar", "Valor Estimado": 0.0, "Cód. Demanda (Siged / clarity)": "5042482", "Objeto/Sistema": "AntecipaGov", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG - CGCON", "Status / Orçamento": "A empenhar", "Valor Estimado": 0.0, "Cód. Demanda (Siged / clarity)": "5042528", "Objeto/Sistema": "Contratos.gov.br", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG - CGCON", "Status / Orçamento": "Em elaboração", "Valor Estimado": 280000.0, "Cód. Demanda (Siged / clarity)": "Não se aplica", "Objeto/Sistema": "Contratos.gov.br", "Categoria Econômica": "Despesas Correntes", "Contratação": "", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGCOP", "Status / Orçamento": "", "Valor Estimado": 146637.22, "Cód. Demanda (Siged / clarity)": "4033303", "Objeto/Sistema": "SCDP", "Categoria Econômica": "", "Contratação": "", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGCOP", "Status / Orçamento": "", "Valor Estimado": 14580.66, "Cód. Demanda (Siged / clarity)": "5153557", "Objeto/Sistema": "SCDP", "Categoria Econômica": "", "Contratação": "Contrato Serpro Nº 65/2021", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGCOP", "Status / Orçamento": "", "Valor Estimado": 1538755.44, "Cód. Demanda (Siged / clarity)": "5239420", "Objeto/Sistema": "SCDP", "Categoria Econômica": "Despesas Correntes", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGCOP", "Status / Orçamento": "A empenhar", "Valor Estimado": 415014.18, "Cód. Demanda (Siged / clarity)": "5378441", "Objeto/Sistema": "APP SCDP", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGCOP", "Status / Orçamento": "Em elaboração", "Valor Estimado": 261722.84, "Cód. Demanda (Siged / clarity)": "5153481", "Objeto/Sistema": "APP SCDP", "Categoria Econômica": "", "Contratação": "", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGCOP", "Status / Orçamento": "Em elaboração", "Valor Estimado": 0.0, "Cód. Demanda (Siged / clarity)": "5206342", "Objeto/Sistema": "SCDP", "Categoria Econômica": "", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGCOP", "Status / Orçamento": "Em elaboração", "Valor Estimado": 810969.64, "Cód. Demanda (Siged / clarity)": "5239420", "Objeto/Sistema": "APP SCDP", "Categoria Econômica": "", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGCOP", "Status / Orçamento": "Em elaboração", "Valor Estimado": 180435.67, "Cód. Demanda (Siged / clarity)": "5256286", "Objeto/Sistema": "[Fase Interna – Novo DC", "Categoria Econômica": "", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGCOP", "Status / Orçamento": "Em elaboração", "Valor Estimado": 121505.5, "Cód. Demanda (Siged / clarity)": "5366628", "Objeto/Sistema": "Registro Cadastral Unificado", "Categoria Econômica": "Despesas Correntes", "Contratação": "", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGGES", "Status / Orçamento": "", "Valor Estimado": 1800000.0, "Cód. Demanda (Siged / clarity)": "5443936", "Objeto/Sistema": "PSA", "Categoria Econômica": "Despesas Correntes", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 3 - Serviços de Informação: 339040 / 21"},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGGES", "Status / Orçamento": "", "Valor Estimado": 2061443.16, "Cód. Demanda (Siged / clarity)": "Não se aplica", "Objeto/Sistema": "API de Compras Públicas (Desenvolvimento)", "Categoria Econômica": "Despesas Correntes", "Contratação": "Contrato SRA/MG nº 02/2022", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGGES", "Status / Orçamento": "A empenhar", "Valor Estimado": 360000.0, "Cód. Demanda (Siged / clarity)": "5043990", "Objeto/Sistema": "Coquat", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG -CGGES", "Status / Orçamento": "Em elaboração", "Valor Estimado": 3500000.0, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "Contrata+Brasil", "Categoria Econômica": "", "Contratação": "", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DELOG", "Área": "DELOG-CGCOP", "Status / Orçamento": "Em elaboração", "Valor Estimado": 165684.89, "Cód. Demanda (Siged / clarity)": "5404119", "Objeto/Sistema": "Registro Cadastral Unificado", "Categoria Econômica": "Despesas de Capital", "Contratação": "", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DINOV", "Área": " CGPGD", "Status / Orçamento": "", "Valor Estimado": 150000.0, "Cód. Demanda (Siged / clarity)": "Não se aplica", "Objeto/Sistema": "Curso sobre gestão do trabalho e gestão organizacional com PGD", "Categoria Econômica": "Despesas Correntes", "Contratação": "Indicar o contrato", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DINOV", "Área": "CGINGA", "Status / Orçamento": "", "Valor Estimado": 400000.0, "Cód. Demanda (Siged / clarity)": "Não se aplica", "Objeto/Sistema": "Consultoria", "Categoria Econômica": "Despesas Correntes", "Contratação": "Em definição", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DINOV", "Área": "GABINETE", "Status / Orçamento": "", "Valor Estimado": 200000.0, "Cód. Demanda (Siged / clarity)": "Não se aplica", "Objeto/Sistema": "Consultoria", "Categoria Econômica": "Despesas Correntes", "Contratação": "Indicar o contrato", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DTGES", "Área": "CGIMP", "Status / Orçamento": "", "Valor Estimado": 200000.0, "Cód. Demanda (Siged / clarity)": "Não se aplica", "Objeto/Sistema": "ProPEN", "Categoria Econômica": "Despesas Correntes", "Contratação": "Não se aplica", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DTGES", "Área": "DTGES", "Status / Orçamento": "", "Valor Estimado": 4284.36, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "Contrato Serpro?", "Categoria Econômica": "", "Contratação": "", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DTGES", "Área": "DTGES", "Status / Orçamento": "", "Valor Estimado": 810.0, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "Govcloud Dataprev?", "Categoria Econômica": "", "Contratação": "", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DTGES", "Área": "DTGES", "Status / Orçamento": "", "Valor Estimado": 3110.0, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "Sistema Gerencial do PEN - SISPEN", "Categoria Econômica": "", "Contratação": "", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "DTPAR", "Área": "DTPAR", "Status / Orçamento": "A empenhar", "Valor Estimado": 954330.0, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "TransfereGov e Obrasgov", "Categoria Econômica": "Despesas Correntes", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 5 - Consultoria"},
+      {"Ano Orçamento": "2026", "Unidade": "DTPAR", "Área": "DTPAR", "Status / Orçamento": "A empenhar", "Valor Estimado": 207400.0, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "TransfereGov e Obrasgov", "Categoria Econômica": "Despesas Correntes", "Contratação": "TED/UFSC - TED 51/2024", "Item do Contrato": "_"},
+      {"Ano Orçamento": "2026", "Unidade": "DTPAR", "Área": "DTPAR - CGIMO", "Status / Orçamento": "A empenhar", "Valor Estimado": 1272440.0, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "Obrasgov", "Categoria Econômica": "Despesas Correntes", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 4 - Infraestrutura"},
+      {"Ano Orçamento": "2026", "Unidade": "DTPAR", "Área": "DTPAR - CGIMO", "Status / Orçamento": "A empenhar", "Valor Estimado": 8672247.15, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "Obrasgov", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 2 - Desenvolvimento / Manutenção corretiva"},
+      {"Ano Orçamento": "2026", "Unidade": "DTPAR", "Área": "DTPAR - CGTEC", "Status / Orçamento": "A empenhar", "Valor Estimado": 2666359.68, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "Aplicativos Parcerias", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 2 - Desenvolvimento / Manutenção corretiva"},
+      {"Ano Orçamento": "2026", "Unidade": "DTPAR", "Área": "DTPAR - CGTEC", "Status / Orçamento": "A empenhar", "Valor Estimado": 26547382.11, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "TransfereGov", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 2 - Desenvolvimento / Manutenção corretiva"},
+      {"Ano Orçamento": "2026", "Unidade": "SEGES", "Área": "CGINF", "Status / Orçamento": "A empenhar", "Valor Estimado": 919867.45, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": " SIORG/ MULTI CLOUD", "Categoria Econômica": "Despesas Correntes", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 4 - Infraestrutura"},
+      {"Ano Orçamento": "2026", "Unidade": "SEGES", "Área": "CGINF", "Status / Orçamento": "A empenhar", "Valor Estimado": 415362.8713, "Cód. Demanda (Siged / clarity)": "5436839", "Objeto/Sistema": " SIORG", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 2 - Serviços de Desenvolvimento, Manutenção"},
+      {"Ano Orçamento": "2026", "Unidade": "SEGES", "Área": "CGINF", "Status / Orçamento": "A empenhar", "Valor Estimado": 854102.3764, "Cód. Demanda (Siged / clarity)": "5442677", "Objeto/Sistema": " SIORG", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 2 - Serviços de Desenvolvimento, Manutenção"},
+      {"Ano Orçamento": "2026", "Unidade": "SEGES", "Área": "CGINF", "Status / Orçamento": "A empenhar", "Valor Estimado": 17762.733, "Cód. Demanda (Siged / clarity)": "5442696", "Objeto/Sistema": " SIORG", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 2 - Serviços de Desenvolvimento, Manutenção"},
+      {"Ano Orçamento": "2026", "Unidade": "SEGES", "Área": "CGINF", "Status / Orçamento": "A empenhar", "Valor Estimado": 71050.932, "Cód. Demanda (Siged / clarity)": "5442701", "Objeto/Sistema": " SIORG", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 2 - Serviços de Desenvolvimento, Manutenção"},
+      {"Ano Orçamento": "2026", "Unidade": "SEGES", "Área": "CGINF", "Status / Orçamento": "A empenhar", "Valor Estimado": 17762.733, "Cód. Demanda (Siged / clarity)": "5442705", "Objeto/Sistema": " SIORG", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 2 - Serviços de Desenvolvimento, Manutenção"},
+      {"Ano Orçamento": "2026", "Unidade": "SEGES", "Área": "CGINF", "Status / Orçamento": "A empenhar", "Valor Estimado": 1000000.0, "Cód. Demanda (Siged / clarity)": "5444547", "Objeto/Sistema": " SIORG", "Categoria Econômica": "Despesas de Capital", "Contratação": "Contrato Serpro Nº 65/2025", "Item do Contrato": "Item 2 - Serviços de Desenvolvimento, Manutenção"},
+      {"Ano Orçamento": "2026", "Unidade": "SEGES", "Área": "CGREL", "Status / Orçamento": "A empenhar", "Valor Estimado": 1800000.0, "Cód. Demanda (Siged / clarity)": "Não se aplica", "Objeto/Sistema": "Central de Atendimento", "Categoria Econômica": "Despesas Correntes", "Contratação": "Contrato Nº 41/2022 - SPEED", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "SEGES", "Área": "CGREL", "Status / Orçamento": "Em elaboração", "Valor Estimado": 300000.0, "Cód. Demanda (Siged / clarity)": "", "Objeto/Sistema": "Sistemas Estruturantes", "Categoria Econômica": "Despesas Correntes", "Contratação": "Contrato Serpro Nº 65/2021", "Item do Contrato": ""},
+      {"Ano Orçamento": "2026", "Unidade": "SEGES", "Área": "GABINETE", "Status / Orçamento": "Em elaboração", "Valor Estimado": 250000.0, "Cód. Demanda (Siged / clarity)": "Não se aplica", "Objeto/Sistema": "Capacitação", "Categoria Econômica": "Despesas Correntes", "Contratação": "", "Item do Contrato": ""}
+    ];
 
     /* --- FUNÇÕES UTILITÁRIAS DE MOEDA E FORMATO --- */
     function parseCurrency(val) {
@@ -305,66 +309,56 @@
       statusEl.innerHTML = `<i class="${icons[type] || icons.idle} text-[11px]"></i> ${message}`;
     }
 
-    /* --- LEITURA DE ARQUIVO LOCAL (EXCEL / CSV / JSON) --- */
+    /* --- LEITURA E PROCESSAMENTO DO ARQUIVO LOCAL (EXCEL / CSV) --- */
     function handleFileUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
 
-      updateSyncStatus('loading', 'Importando arquivo local...');
+      updateSyncStatus('loading', 'Importando dados do arquivo...');
 
       const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, {type: 'array'});
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonRecords = XLSX.utils.sheet_to_json(worksheet);
 
-      if (file.name.endsWith('.json')) {
-        reader.onload = function (e) {
-          try {
-            const jsonRecords = JSON.parse(e.target.result);
+          if (jsonRecords && jsonRecords.length > 0) {
             initData(jsonRecords);
             const hora = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
-            updateSyncStatus('success', `Importado local: ${file.name} (${hora})`);
-          } catch (err) {
-            alert("Erro ao ler arquivo JSON.");
-            updateSyncStatus('error', 'Erro no JSON');
+            updateSyncStatus('success', `Importado: ${file.name} (${hora})`);
+          } else {
+            alert("O arquivo selecionado não contém dados válidos.");
+            updateSyncStatus('error', 'Arquivo sem dados');
           }
-        };
-        reader.readAsText(file);
-      } else {
-        reader.onload = function (e) {
-          try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, {type: 'array'});
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const jsonRecords = XLSX.utils.sheet_to_json(worksheet);
+        } catch (err) {
+          console.error("Erro ao ler arquivo:", err);
+          alert("Ocorreu um erro ao ler o arquivo Excel. Verifique se a estrutura das colunas está correta.");
+          updateSyncStatus('error', 'Falha na importação');
+        }
+      };
 
-            if (jsonRecords && jsonRecords.length > 0) {
-              initData(jsonRecords);
-              const hora = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
-              updateSyncStatus('success', `Importado local: ${file.name} (${hora})`);
-            } else {
-              alert("O arquivo selecionado não contém dados válidos.");
-              updateSyncStatus('error', 'Arquivo sem dados');
-            }
-          } catch (err) {
-            console.error("Erro ao ler arquivo:", err);
-            alert("Erro ao ler planilha Excel.");
-            updateSyncStatus('error', 'Falha na importação');
-          }
-        };
-        reader.readAsArrayBuffer(file);
-      }
+      reader.readAsArrayBuffer(file);
     }
 
     function initData(jsonRecords) {
-      if (!Array.isArray(jsonRecords) || jsonRecords.length === 0) return;
+      const data = jsonRecords || window.EMBEDDED_DEMANDAS || [];
+      if (!Array.isArray(data) || data.length === 0) return;
 
-      window.state.rawData = jsonRecords.map((row, index) => ({
+      window.state.rawData = data.map((row, index) => ({
         ...row,
         __id: index,
         'Valor Estimado': parseCurrency(row['Valor Estimado'])
       }));
 
       window.state.isInitialized = true;
+
+      // Atualiza opções dos seletores dinâmicos
       populateSelectOptions();
+
+      // Aplica os filtros ativos aos novos dados
       applyFilters();
     }
 
@@ -469,7 +463,7 @@
 
       const data = window.state.filteredData;
       if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">Nenhum dado disponível.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">Nenhum dado disponível para o filtro atual.</td></tr>`;
         return;
       }
 
@@ -530,7 +524,7 @@
 
       const data = window.state.filteredData;
       if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="px-4 py-8 text-center text-gray-400">Nenhum registro encontrado.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="px-4 py-8 text-center text-gray-400">Nenhum registro encontrado para os filtros selecionados.</td></tr>`;
         return;
       }
 
@@ -591,7 +585,8 @@
 
     /* --- INICIALIZAÇÃO DA PÁGINA --- */
     document.addEventListener('DOMContentLoaded', () => {
-      loadDataFromGithub();
+      initData(window.EMBEDDED_DEMANDAS);
+      updateSyncStatus('idle', 'Dados base carregados (Clique em "Importar Dados" para atualizar)');
     });
   </script>
 </body>
