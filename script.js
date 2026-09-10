@@ -5,7 +5,7 @@ window.state = {
   isInitialized: false
 };
 
-// URL do arquivo de dados no seu repositório
+// URL do arquivo de dados no seu repositório GitHub
 const GITHUB_DATA_URL = 'https://raw.githubusercontent.com/marcosangelo83-coder/Relatorio/main/demandas.json';
 
 /* --- SINCRONIZAÇÃO AUTOMÁTICA VIA GITHUB --- */
@@ -24,7 +24,7 @@ async function loadDataFromGithub() {
 
     if (isExcel) {
       const arrayBuffer = await response.arrayBuffer();
-      const workbook = XLSX.read(new Uint8Array(arrayBuffer), {type: 'array'});
+      const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
       jsonRecords = XLSX.utils.sheet_to_json(worksheet);
@@ -34,7 +34,7 @@ async function loadDataFromGithub() {
 
     if (Array.isArray(jsonRecords) && jsonRecords.length > 0) {
       initData(jsonRecords);
-      const hora = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       updateSyncStatus('success', `Atualizado via GitHub (${hora})`);
     } else {
       throw new Error('Arquivo no GitHub não possui registros válidos.');
@@ -56,7 +56,7 @@ function parseCurrency(val) {
 
 function formatBRL(valor) {
   const num = typeof valor === 'number' ? valor : parseCurrency(valor);
-  return num.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+  return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function updateSyncStatus(type, message) {
@@ -94,7 +94,7 @@ function handleFileUpload(event) {
       try {
         const jsonRecords = JSON.parse(e.target.result);
         initData(jsonRecords);
-        const hora = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+        const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         updateSyncStatus('success', `Importado local: ${file.name} (${hora})`);
       } catch (err) {
         alert("Erro ao ler arquivo JSON.");
@@ -106,14 +106,14 @@ function handleFileUpload(event) {
     reader.onload = function (e) {
       try {
         const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, {type: 'array'});
+        const workbook = XLSX.read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         const jsonRecords = XLSX.utils.sheet_to_json(worksheet);
 
         if (jsonRecords && jsonRecords.length > 0) {
           initData(jsonRecords);
-          const hora = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+          const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
           updateSyncStatus('success', `Importado local: ${file.name} (${hora})`);
         } else {
           alert("O arquivo selecionado não contém dados válidos.");
@@ -153,13 +153,13 @@ function notifyStateChange() {
 /* --- FILTROS --- */
 function populateSelectOptions() {
   const filterFields = [
-    {id: 'filterUnidade', key: 'Unidade'},
-    {id: 'filterStatus', key: 'Status / Orçamento'},
-    {id: 'filterCategoria', key: 'Categoria Econômica'},
-    {id: 'filterContratacao', key: 'Contratação'}
+    { id: 'filterUnidade', key: 'Unidade' },
+    { id: 'filterStatus', key: 'Status / Orçamento' },
+    { id: 'filterCategoria', key: 'Categoria Econômica' },
+    { id: 'filterContratacao', key: 'Contratação' }
   ];
 
-  filterFields.forEach(({id, key}) => {
+  filterFields.forEach(({ id, key }) => {
     const select = document.getElementById(id);
     if (!select) return;
 
@@ -218,7 +218,7 @@ function resetFilters() {
   applyFilters();
 }
 
-/* --- RENDERIZAÇÃO --- */
+/* --- RENDERIZAÇÃO DE PAINÉIS E TABELAS --- */
 function renderKPIs() {
   const totalRecords = window.state.filteredData.length;
   const totalValue = window.state.filteredData.reduce((acc, row) => acc + (row['Valor Estimado'] || 0), 0);
@@ -229,10 +229,15 @@ function renderKPIs() {
     .filter(row => row['Categoria Econômica'] === 'Despesas Correntes')
     .reduce((acc, row) => acc + (row['Valor Estimado'] || 0), 0);
 
-  document.getElementById('kpiTotalRecords').textContent = totalRecords;
-  document.getElementById('kpiTotalValue').textContent = formatBRL(totalValue);
-  document.getElementById('kpiCapitalValue').textContent = formatBRL(capitalValue);
-  document.getElementById('kpiCurrentValue').textContent = formatBRL(currentValue);
+  const totalRecEl = document.getElementById('kpiTotalRecords');
+  const totalValEl = document.getElementById('kpiTotalValue');
+  const capValEl = document.getElementById('kpiCapitalValue');
+  const curValEl = document.getElementById('kpiCurrentValue');
+
+  if (totalRecEl) totalRecEl.textContent = totalRecords;
+  if (totalValEl) totalValEl.textContent = formatBRL(totalValue);
+  if (capValEl) capValEl.textContent = formatBRL(capitalValue);
+  if (curValEl) curValEl.textContent = formatBRL(currentValue);
 }
 
 function renderSyntheticTable() {
@@ -253,12 +258,12 @@ function renderSyntheticTable() {
   const summaryMap = {};
 
   data.forEach(item => {
-    const contratacao = (item['Contratação'] && item['Contratação'].trim()) ? item['Contratação'].trim() : '(Não Informado)';
-    const categoria = (item['Categoria Econômica'] && item['Categoria Econômica'].trim()) ? item['Categoria Econômica'].trim() : '(Não Informado)';
+    const contratacao = (item['Contratação'] && item['Contratação'].toString().trim()) ? item['Contratação'].toString().trim() : '(Não Informado)';
+    const categoria = (item['Categoria Econômica'] && item['Categoria Econômica'].toString().trim()) ? item['Categoria Econômica'].toString().trim() : '(Não Informado)';
     const key = `${contratacao}||${categoria}`;
 
     if (!summaryMap[key]) {
-      summaryMap[key] = {contratacao, categoria, count: 0, totalValue: 0};
+      summaryMap[key] = { contratacao, categoria, count: 0, totalValue: 0 };
     }
     summaryMap[key].count += 1;
     summaryMap[key].totalValue += (item['Valor Estimado'] || 0);
@@ -271,29 +276,30 @@ function renderSyntheticTable() {
     const tr = document.createElement('tr');
     tr.className = "hover:bg-gray-50 border-b border-gray-100 transition-colors";
     tr.innerHTML = `
-    <td class="px-4 py-2.5 font-medium text-gray-800">${row.contratacao}</td>
-    <td class="px-4 py-2.5">
-      <span class="inline-block px-2 py-0.5 text-xs rounded font-medium ${row.categoria === 'Despesas de Capital' ? 'bg-purple-100 text-purple-700' :
-        row.categoria === 'Despesas Correntes' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
-      }">
-        ${row.categoria}
-      </span>
-    </td>
-    <td class="px-4 py-2.5 text-center font-medium">${row.count}</td>
-    <td class="px-4 py-2.5 text-right font-bold text-gray-900">${formatBRL(row.totalValue)}</td>
-    <td class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">${pct.toFixed(2)}%</td>
-  `;
+      <td class="px-4 py-2.5 font-medium text-gray-800">${row.contratacao}</td>
+      <td class="px-4 py-2.5">
+        <span class="inline-block px-2 py-0.5 text-xs rounded font-medium ${
+          row.categoria === 'Despesas de Capital' ? 'bg-purple-100 text-purple-700' :
+          row.categoria === 'Despesas Correntes' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
+        }">
+          ${row.categoria}
+        </span>
+      </td>
+      <td class="px-4 py-2.5 text-center font-medium">${row.count}</td>
+      <td class="px-4 py-2.5 text-right font-bold text-gray-900">${formatBRL(row.totalValue)}</td>
+      <td class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">${pct.toFixed(2)}%</td>
+    `;
     tbody.appendChild(tr);
   });
 
   tfoot.innerHTML = `
-  <tr>
-    <td colspan="2" class="px-4 py-3 text-right font-bold text-gray-800">TOTAL SINTÉTICO:</td>
-    <td class="px-4 py-3 text-center font-bold text-blue-700">${data.length}</td>
-    <td class="px-4 py-3 text-right font-bold text-blue-700">${formatBRL(totalValAll)}</td>
-    <td class="px-4 py-3 text-right font-bold text-blue-700">100,00%</td>
-  </tr>
-`;
+    <tr>
+      <td colspan="2" class="px-4 py-3 text-right font-bold text-gray-800">TOTAL SINTÉTICO:</td>
+      <td class="px-4 py-3 text-center font-bold text-blue-700">${data.length}</td>
+      <td class="px-4 py-3 text-right font-bold text-blue-700">${formatBRL(totalValAll)}</td>
+      <td class="px-4 py-3 text-right font-bold text-blue-700">100,00%</td>
+    </tr>
+  `;
 }
 
 function renderAnalyticalTable() {
@@ -314,37 +320,39 @@ function renderAnalyticalTable() {
     const tr = document.createElement('tr');
     tr.className = "hover:bg-blue-50/50 transition-colors border-b border-gray-100";
     tr.innerHTML = `
-    <td class="px-4 py-3 text-xs">${row['Ano Orçamento'] || '-'}</td>
-    <td class="px-4 py-3 font-semibold text-gray-800 text-xs">${row['Unidade'] || '-'}</td>
-    <td class="px-4 py-3 text-xs">${row['Área'] || '-'}</td>
-    <td class="px-4 py-3 text-xs">
-      <span class="inline-block px-2 py-0.5 text-xs rounded-full font-medium ${row['Status / Orçamento'] === 'A empenhar' ? 'bg-emerald-100 text-emerald-800' :
-        row['Status / Orçamento'] === 'Em elaboração' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'
-      }">
-        ${row['Status / Orçamento'] || 'Não definido'}
-      </span>
-    </td>
-    <td class="px-4 py-3 text-right font-semibold text-gray-900 text-xs">${formatBRL(row['Valor Estimado'])}</td>
-    <td class="px-4 py-3 text-xs font-mono text-gray-500">${row['Cód. Demanda (Siged / clarity)'] || '-'}</td>
-    <td class="px-4 py-3 text-xs text-gray-800 font-medium">${row['Objeto/Sistema'] || '-'}</td>
-    <td class="px-4 py-3 text-xs">${row['Categoria Econômica'] || '-'}</td>
-    <td class="px-4 py-3 text-xs text-gray-700">${row['Contratação'] || '-'}</td>
-    <td class="px-4 py-3 text-xs text-gray-500">${row['Item do Contrato'] || '-'}</td>
-  `;
+      <td class="px-4 py-3 text-xs">${row['Ano Orçamento'] || '-'}</td>
+      <td class="px-4 py-3 font-semibold text-gray-800 text-xs">${row['Unidade'] || '-'}</td>
+      <td class="px-4 py-3 text-xs">${row['Área'] || '-'}</td>
+      <td class="px-4 py-3 text-xs">
+        <span class="inline-block px-2 py-0.5 text-xs rounded-full font-medium ${
+          row['Status / Orçamento'] === 'A empenhar' ? 'bg-emerald-100 text-emerald-800' :
+          row['Status / Orçamento'] === 'Em elaboração' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'
+        }">
+          ${row['Status / Orçamento'] || 'Não definido'}
+        </span>
+      </td>
+      <td class="px-4 py-3 text-right font-semibold text-gray-900 text-xs">${formatBRL(row['Valor Estimado'])}</td>
+      <td class="px-4 py-3 text-xs font-mono text-gray-500">${row['Cód. Demanda (Siged / clarity)'] || '-'}</td>
+      <td class="px-4 py-3 text-xs text-gray-800 font-medium">${row['Objeto/Sistema'] || '-'}</td>
+      <td class="px-4 py-3 text-xs">${row['Categoria Econômica'] || '-'}</td>
+      <td class="px-4 py-3 text-xs text-gray-700">${row['Contratação'] || '-'}</td>
+      <td class="px-4 py-3 text-xs text-gray-500">${row['Item do Contrato'] || '-'}</td>
+    `;
     tbody.appendChild(tr);
   });
 
   const totalVal = data.reduce((sum, item) => sum + (item['Valor Estimado'] || 0), 0);
 
   tfoot.innerHTML = `
-  <tr>
-    <td colspan="4" class="px-4 py-3 text-right font-bold text-gray-800">TOTAL ANALÍTICO (${data.length} ITENS):</td>
-    <td class="px-4 py-3 text-right font-bold text-blue-700 text-sm">${formatBRL(totalVal)}</td>
-    <td colspan="5" class="px-4 py-3"></td>
-  </tr>
-`;
+    <tr>
+      <td colspan="4" class="px-4 py-3 text-right font-bold text-gray-800">TOTAL ANALÍTICO (${data.length} ITENS):</td>
+      <td class="px-4 py-3 text-right font-bold text-blue-700 text-sm">${formatBRL(totalVal)}</td>
+      <td colspan="5" class="px-4 py-3"></td>
+    </tr>
+  `;
 }
 
+/* --- EXPORTAÇÃO EXCEL --- */
 function exportToExcel() {
   if (!window.state.filteredData || window.state.filteredData.length === 0) {
     alert("Não há dados para exportar.");
@@ -352,7 +360,7 @@ function exportToExcel() {
   }
 
   const exportData = window.state.filteredData.map(row => {
-    const cleanRow = {...row};
+    const cleanRow = { ...row };
     delete cleanRow.__id;
     return cleanRow;
   });
@@ -364,6 +372,7 @@ function exportToExcel() {
   XLSX.writeFile(workbook, `Demandas_SEGES_2026_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
+/* --- INICIALIZAÇÃO NA CARGA DA PÁGINA --- */
 document.addEventListener('DOMContentLoaded', () => {
   loadDataFromGithub();
 });
