@@ -602,4 +602,439 @@ window.clearGithubToken = clearGithubToken;
 document.addEventListener('DOMContentLoaded', () => {
   // Executa o PULL inicial do GitHub para preencher o painel
   loadDataFromGithub();
+
+/* --- 📄 UPLOAD E PARSING DE ARQUIVO LOCAL (EXCEL/JSON) --- */
+// Função chamada quando o usuário seleciona um arquivo no input file
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  updateSyncStatus('loading', 'Importando arquivo local...');
+  const reader = new FileReader();
+
+  // Parsing baseado na extensão do arquivo local
+  if (file.name.endsWith('.json')) {
+    reader.onload = function (e) {
+      try {
+        const jsonRecords = JSON.parse(e.target.result);
+        if (!Array.isArray(jsonRecords) || jsonRecords.length === 0) {
+          throw new Error("Arquivo JSON vazio ou em formato inválido.");
+        }
+        initData(jsonRecords); // Atualiza a TELA (window.state)
+        const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        updateSyncStatus('idle', `Importado local: ${file.name} (${hora})`);
+      } catch (err) {
+        alert(`Erro ao ler arquivo JSON local: ${err.message}`);
+        updateSyncStatus('error', 'Erro no JSON');
+      }
+    };
+    reader.onerror = () => {
+        alert("Erro na leitura do arquivo local.");
+        updateSyncStatus('error', 'Falha na leitura');
+    };
+    reader.readAsText(file);
+  } else {
+    // Padrão Excel (.xlsx, .xls) - PARSER ROBUSTO ATUALIZADO
+    reader.onload = function (e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // Lógica de parsing robusta: Lemos como matriz pura (header: 1)
+        // para mapear as colunas manualmente pelos nomes exatos, ignorando espaços extras ou formatações.
+        const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+
+        if (!rawRows || rawRows.length < 2) {
+          throw new Error("A planilha selecionada está vazia ou não contém dados válidos.");
+        }
+
+        // 1. Identifica os cabeçalhos na primeira linha válida
+        const headers = rawRows[0].map(h => (h ? h.toString().trim() : ''));
+
+        // 2. Mapeia os índices das colunas necessárias baseados nos cabeçalhos esperados pelo sistema
+        const colIndices = {
+          'Ano Orçamento': headers.indexOf('Ano Orçamento'),
+          'Unidade': headers.indexOf('Unidade'),
+          'Área': headers.indexOf('Área'),
+          'Status / Orçamento': headers.indexOf('Status / Orçamento'),
+          'Valor Estimado': headers.indexOf('Valor Estimado'),
+          'Cód. Demanda (Siged / clarity)': headers.indexOf('Cód. Demanda (Siged / clarity)'),
+          'Objeto/Sistema': headers.indexOf('Objeto/Sistema'),
+          'Categoria Econômica': headers.indexOf('Categoria Econômica'),
+          'Contratação': headers.indexOf('Contratação'),
+          'Item do Contrato': headers.indexOf('Item do Contrato')
+        };
+
+        // Verificação crítica: Garante que as colunas essenciais existem na planilha
+        const colunasObrigatorias = ['Unidade', 'Status / Orçamento', 'Valor Estimado', 'Objeto/Sistema', 'Contratação'];
+        const colunasFaltantes = colunasObrigatorias.filter(col => colIndices[col] === -1);
+
+        if (colunasFaltantes.length > 0) {
+          throw new Error(`A planilha Excel está incompleta. Coluna(s) obrigatória(s) não encontrada(s): ${colunasFaltantes.join(', ')}. Verifique os cabeçalhos da planilha.`);
+        }
+
+        // 3. Processa as linhas de dados (começando da linha 1, após os cabeçalhos)
+        const jsonRecords = [];
+        for (let i = 1; i < rawRows.length; i++) {
+          const row = rawRows[i];
+          // Pula linhas que estão completamente vazias na planilha Excel
+          if (!row || row.every(cell => cell === null || cell === '')) continue;
+
+          // Cria o objeto JSON mapeando os índices encontrados para os nomes de propriedade esperados
+          const record = {
+            'Ano Orçamento': colIndices['Ano Orçamento'] !== -1 ? row[colIndices['Ano Orçamento']] : null,
+            'Unidade': row[colIndices['Unidade']], // Obrigatória
+            'Área': colIndices['Área'] !== -1 ? row[colIndices['Área']] : null,
+            'Status / Orçamento': row[colIndices['Status / Orçamento']], // Obrigatória
+            'Valor Estimado': row[colIndices['Valor Estimado']], // Obrigatória
+            'Cód. Demanda (Siged / clarity)': colIndices['Cód. Demanda (Siged / clarity)'] !== -1 ? row[colIndices['Cód. Demanda (Siged / clarity)']] : null,
+            'Objeto/Sistema': row[colIndices['Objeto/Sistema']], // Obrigatória
+            'Categoria Econômica': colIndices['Categoria Econômica'] !== -1 ? row[colIndices['Categoria Econômica']] : null,
+            'Contratação': row[colIndices['Contratação']], // Obrigatória
+            'Item do Contrato': colIndices['Item do Contrato'] !== -1 ? row[colIndices['Item do Contrato']] : null
+          };
+          jsonRecords.push(record);
+        }
+
+        if (jsonRecords.length > 0) {
+          initData(jsonRecords); // Atualiza o estado da tela com os dados lidos
+          const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          updateSyncStatus('idle', `Importado local: ${file.name} (${jsonRecords.length} registros) em ${hora}`);
+          console.info('Dados importados localmente. Clique em "Atualizar do GitHub" para salvar permanentemente na nuvem.');
+        } else {
+          throw new Error("O arquivo Excel foi lido, mas não contém linhas de dados válidas abaixo dos cabeçalhos.");
+        }
+      } catch (err) {
+        console.error("Erro crítico no parser Excel local:", err);
+        alert(`Falha na importação do Excel: ${err.message}`);
+        updateSyncStatus('error', 'Falha na importação');
+      }
+    };
+    reader.onerror = () => {
+        alert("Erro na leitura física do arquivo Excel.");
+        updateSyncStatus('error', 'Falha na leitura');
+    };
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+/* --- 🔄 INICIALIZAÇÃO DO ESTADO E RENDERIZAÇÃO --- */
+// Recebe registros JSON puros, processa moedas e atualiza o estado global e a UI
+function initData(jsonRecords) {
+  if (!Array.isArray(jsonRecords) || jsonRecords.length === 0) return;
+
+  // Processamento e limpeza de dados
+  window.state.rawData = jsonRecords.map((row, index) => ({
+    ...row,
+    __id: index, // Adiciona ID único temporário para controle da tabela analítica
+    // Garante que o campo 'Valor Estimado' seja um float puro para cálculos
+    'Valor Estimado': parseCurrency(row['Valor Estimado'])
+  }));
+
+  window.state.isInitialized = true;
+  // Recarrega as opções dos filtros baseados nos novos dados
+  populateSelectOptions();
+  // Aplica filtros vazios para renderizar tudo inicialmente
+  applyFilters();
+}
+
+// Função centralizadora chamada sempre que o estado dos dados filtrados muda
+function notifyStateChange() {
+  // Se não houver dados, não renderiza (as funções de render tratam o estado vazio)
+  renderKPIs();
+  renderSyntheticTable();
+  renderAnalyticalTable();
+}
+
+/* --- 🔍 GERENCIAMENTO DE FILTROS DINÂMICOS --- */
+// Preenche os elementos <select> HTML com opções únicas baseadas nos dados brutos
+function populateSelectOptions() {
+  const filterFields = [
+    { id: 'filterUnidade', key: 'Unidade' },
+    { id: 'filterStatus', key: 'Status / Orçamento' },
+    { id: 'filterCategoria', key: 'Categoria Econômica' },
+    { id: 'filterContratacao', key: 'Contratação' }
+  ];
+
+  filterFields.forEach(({ id, key }) => {
+    const select = document.getElementById(id);
+    if (!select) return;
+
+    // Guarda o valor que estava selecionado antes de recarregar
+    const currentValue = select.value;
+    
+    // Obtém valores únicos, remove nulos, formata e ordena
+    const values = [...new Set(window.state.rawData.map(item => 
+      (item[key] || '(Vazio)').toString().trim()
+    ))].sort();
+
+    // Reinicia o select com a opção padrão
+    select.innerHTML = `<option value="">Todas as Opções (${key})</option>`;
+    
+    // Adiciona as novas opções dinâmicas
+    values.forEach(val => {
+      const option = document.createElement('option');
+      option.value = val;
+      option.textContent = val;
+      select.appendChild(option);
+    });
+    
+    // Tenta restaurar o valor selecionado anteriormente
+    select.value = currentValue;
+  });
+}
+
+// Chamada pelo HTML (onchange) quando um filtro é alterado
+function handleFilterChange(field, value) {
+  if (!value) {
+    // Se selecionou a opção vazia, remove o filtro ativo
+    delete window.state.activeFilters[field];
+  } else {
+    // Adiciona ou atualiza o filtro ativo
+    window.state.activeFilters[field] = value;
+  }
+  applyFilters();
+}
+
+// Executa a lógica de filtragem combinada sobre os dados brutos (window.state.rawData)
+function applyFilters() {
+  // Gera window.state.filteredData a partir do rawData
+  window.state.filteredData = window.state.rawData.filter(row => {
+    // Retorna true apenas se a linha passar em TODOS os filtros ativos (lógica AND)
+    return Object.entries(window.state.activeFilters).every(([key, val]) => {
+      // Formata o valor da linha para comparação (tratando vazios)
+      const rowVal = (row[key] || '(Vazio)').toString().trim();
+      return rowVal === val;
+    });
+  });
+
+  // Atualiza o contador de registros visíveis na UI
+  const filterCounter = document.getElementById('filterCounter');
+  const activeCount = Object.keys(window.state.activeFilters).length;
+  if (filterCounter) {
+    if (activeCount === 0) {
+      filterCounter.textContent = `Mostrando todos os ${window.state.filteredData.length} registros`;
+      filterCounter.className = "text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full";
+    } else {
+      filterCounter.textContent = `${activeCount} filtro(s) ativo(s) | ${window.state.filteredData.length} registro(s)`;
+      filterCounter.className = "text-xs font-semibold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full";
+    }
+  }
+
+  // Notifica que os dados filtrados mudaram para engatilhar a renderização
+  notifyStateChange();
+}
+
+// Limpa todos os filtros ativos e reseta os selects na UI
+function resetFilters() {
+  window.state.activeFilters = {};
+  // Reseta visualmente os selects
+  ['filterUnidade', 'filterStatus', 'filterCategoria', 'filterContratacao'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  applyFilters(); // Re-aplica (vai mostrar tudo)
+}
+
+/* --- 📊 RENDERIZAÇÃO DE UI (KPIs E TABELAS) --- */
+// Calcula e renderiza os cards de KPI baseados nos dados filtrados
+function renderKPIs() {
+  const data = window.state.filteredData;
+  const totalRecords = data.length;
+  
+  // Somatórios usando reduce sobre o float puro
+  const totalValue = data.reduce((acc, row) => acc + (row['Valor Estimado'] || 0), 0);
+  const capitalValue = data
+    .filter(row => row['Categoria Econômica'] === 'Despesas de Capital')
+    .reduce((acc, row) => acc + (row['Valor Estimado'] || 0), 0);
+  const currentValue = data
+    .filter(row => row['Categoria Econômica'] === 'Despesas Correntes')
+    .reduce((acc, row) => acc + (row['Valor Estimado'] || 0), 0);
+
+  // Seleciona elementos HTML
+  const totalRecEl = document.getElementById('kpiTotalRecords');
+  const totalValEl = document.getElementById('kpiTotalValue');
+  const capValEl = document.getElementById('kpiCapitalValue');
+  const curValEl = document.getElementById('kpiCurrentValue');
+
+  // Atualiza conteúdo formatado
+  if (totalRecEl) totalRecEl.textContent = totalRecords;
+  if (totalValEl) totalValEl.textContent = formatBRL(totalValue);
+  if (capValEl) capValEl.textContent = formatBRL(capitalValue);
+  if (curValEl) curValEl.textContent = formatBRL(currentValue);
+}
+
+// Agrupa dados e renderiza a Tabela Sintética (Resumo)
+function renderSyntheticTable() {
+  const tbody = document.getElementById('syntheticTableBody');
+  const tfoot = document.getElementById('syntheticTableFooter');
+  if (!tbody || !tfoot) return;
+
+  // Limpa conteúdo anterior
+  tbody.innerHTML = '';
+  tfoot.innerHTML = '';
+
+  const data = window.state.filteredData;
+  if (data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">Nenhum dado disponível para os filtros selecionados.</td></tr>`;
+    return;
+  }
+
+  // Lógica de Agrupamento (Combinação: Contratação + Categoria Econômica)
+  const totalValAll = data.reduce((sum, item) => sum + (item['Valor Estimado'] || 0), 0);
+  const summaryMap = {};
+
+  data.forEach(item => {
+    const contratacao = (item['Contratação'] && item['Contratação'].toString().trim()) ? item['Contratação'].toString().trim() : '(Não Informado)';
+    const categoria = (item['Categoria Econômica'] && item['Categoria Econômica'].toString().trim()) ? item['Categoria Econômica'].toString().trim() : '(Não Informado)';
+    // Chave composta para agrupamento
+    const key = `${contratacao}||${categoria}`;
+
+    if (!summaryMap[key]) {
+      summaryMap[key] = { contratacao, categoria, count: 0, totalValue: 0 };
+    }
+    summaryMap[key].count += 1;
+    summaryMap[key].totalValue += (item['Valor Estimado'] || 0);
+  });
+
+  // Converte mapa para array e ordena por valor total descrescente
+  const summaryArray = Object.values(summaryMap).sort((a, b) => b.totalValue - a.totalValue);
+
+  // Renderiza linhas do corpo (tbody)
+  summaryArray.forEach(row => {
+    // Calcula porcentagem do grupo em relação ao total visível
+    const pct = totalValAll > 0 ? (row.totalValue / totalValAll) * 100 : 0;
+    const tr = document.createElement('tr');
+    tr.className = "hover:bg-gray-50 border-b border-gray-100 transition-colors";
+    
+    // Classes CSS dinâmicas para o badge da categoria
+    const badgeClass = row.categoria === 'Despesas de Capital' ? 'bg-purple-100 text-purple-700' :
+                       row.categoria === 'Despesas Correntes' ? 'bg-amber-100 text-amber-700' : 
+                       'bg-gray-100 text-gray-600';
+
+    tr.innerHTML = `
+      <td class="px-4 py-2.5 font-medium text-gray-800">${row.contratacao}</td>
+      <td class="px-4 py-2.5">
+        <span class="inline-block px-2 py-0.5 text-xs rounded font-medium ${badgeClass}">
+          ${row.categoria}
+        </span>
+      </td>
+      <td class="px-4 py-2.5 text-center font-medium">${row.count}</td>
+      <td class="px-4 py-2.5 text-right font-bold text-gray-900">${formatBRL(row.totalValue)}</td>
+      <td class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">${pct.toFixed(2)}%</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Renderiza linha de total no rodapé (tfoot)
+  tfoot.innerHTML = `
+    <tr>
+      <td colspan="2" class="px-4 py-3 text-right font-bold text-gray-800">TOTAL SINTÉTICO (Visível):</td>
+      <td class="px-4 py-3 text-center font-bold text-blue-700">${data.length}</td>
+      <td class="px-4 py-3 text-right font-bold text-blue-700">${formatBRL(totalValAll)}</td>
+      <td class="px-4 py-3 text-right font-bold text-blue-700">100,00%</td>
+    </tr>
+  `;
+}
+
+// Renderiza a Tabela Analítica (Detalhamento item a item)
+function renderAnalyticalTable() {
+  const tbody = document.getElementById('analyticalTableBody');
+  const tfoot = document.getElementById('analyticalTableFooter');
+  if (!tbody || !tfoot) return;
+
+  // Limpa conteúdo anterior
+  tbody.innerHTML = '';
+  tfoot.innerHTML = '';
+
+  const data = window.state.filteredData;
+  if (data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" class="px-4 py-8 text-center text-gray-400">Nenhum registro encontrado para os filtros aplicados.</td></tr>`;
+    return;
+  }
+
+  // Renderiza linhas do corpo (tbody)
+  data.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.className = "hover:bg-blue-50/50 transition-colors border-b border-gray-100";
+    
+    // Classes CSS dinâmicas para o badge do status
+    const statusBadgeClass = row['Status / Orçamento'] === 'A empenhar' ? 'bg-emerald-100 text-emerald-800' :
+                             row['Status / Orçamento'] === 'Em elaboração' ? 'bg-amber-100 text-amber-800' : 
+                             'bg-gray-100 text-gray-600';
+
+    tr.innerHTML = `
+      <td class="px-4 py-3 text-xs">${row['Ano Orçamento'] || '-'}</td>
+      <td class="px-4 py-3 font-semibold text-gray-800 text-xs">${row['Unidade'] || '-'}</td>
+      <td class="px-4 py-3 text-xs">${row['Área'] || '-'}</td>
+      <td class="px-4 py-3 text-xs">
+        <span class="inline-block px-2 py-0.5 text-xs rounded-full font-medium ${statusBadgeClass}">
+          ${row['Status / Orçamento'] || 'Não definido'}
+        </span>
+      </td>
+      <td class="px-4 py-3 text-right font-semibold text-gray-900 text-xs">${formatBRL(row['Valor Estimado'])}</td>
+      <td class="px-4 py-3 text-xs font-mono text-gray-500">${row['Cód. Demanda (Siged / clarity)'] || '-'}</td>
+      <td class="px-4 py-3 text-xs text-gray-800 font-medium">${row['Objeto/Sistema'] || '-'}</td>
+      <td class="px-4 py-3 text-xs">${row['Categoria Econômica'] || '-'}</td>
+      <td class="px-4 py-3 text-xs text-gray-700">${row['Contratação'] || '-'}</td>
+      <td class="px-4 py-3 text-xs text-gray-500">${row['Item do Contrato'] || '-'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Calcula total analítico visível
+  const totalVal = data.reduce((sum, item) => sum + (item['Valor Estimado'] || 0), 0);
+
+  tfoot.innerHTML = `
+    <tr>
+      <td colspan="4" class="px-4 py-3 text-right font-bold text-gray-800">TOTAL ANALÍTICO (${data.length} ITENS):</td>
+      <td class="px-4 py-3 text-right font-bold text-blue-700 text-sm">${formatBRL(totalVal)}</td>
+      <td colspan="5" class="px-4 py-3"></td>
+    </tr>
+  `;
+}
+
+/* --- 📤 EXPORTAÇÃO DE DADOS PARA EXCEL LOCAL --- */
+// Gera um arquivo .xlsx contendo exatamente os dados visíveis (filtrados) na tela analítica
+function exportToExcel() {
+  if (!window.state.filteredData || window.state.filteredData.length === 0) {
+    alert("Não há dados visíveis para exportar. Remova alguns filtros.");
+    return;
+  }
+
+  // Prepara dados limpando metadados internos (__id) antes de gerar a planilha
+  const exportData = window.state.filteredData.map(row => {
+    const cleanRow = { ...row };
+    delete cleanRow.__id; // Remove ID local
+    return cleanRow;
+  });
+
+  // Usa biblioteca XLSX para criar workbook e worksheet
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Demandas Analíticas Filtradas");
+
+  // Gera download do arquivo no navegador
+  const dataSufixo = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  XLSX.writeFile(workbook, `Demandas_SEGES_2026_Export_${dataSufixo}.xlsx`);
+}
+
+// 🌐 Exportar funções cruciais para o escopo global (window)
+// Isso é necessário porque o HTML Tailwind usa atributos onclick="funcao()" diretamente
+window.loadDataFromGithub = loadDataFromGithub;
+window.saveToGithub = saveToGithub; // Agora vinculado ao botão "Sincronizar"
+window.handleFileUpload = handleFileUpload;
+window.handleFilterChange = handleFilterChange;
+window.resetFilters = resetFilters;
+window.exportToExcel = exportToExcel;
+window.clearGithubToken = clearGithubToken;
+
+/* --- 🚀 INICIALIZAÇÃO AUTOMÁTICA NA CARGA DA PÁGINA --- */
+document.addEventListener('DOMContentLoaded', () => {
+  // Executa o PULL inicial do GitHub para preencher o painel
+  loadDataFromGithub();
+});
+
 });```
