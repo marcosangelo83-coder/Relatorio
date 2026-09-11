@@ -9,24 +9,38 @@ window.state = {
 const REPO_OWNER = 'marcosangelo83-coder';
 const REPO_NAME = 'Relatorio';
 const FILE_PATH = 'demandas.json';
-const GITHUB_TOKEN = ''; 
+const GITHUB_TOKEN = ''; // Opcional: Cole aqui ou informe no prompt (ficará salvo no navegador)
 
-/* --- 🔑 SINCRONIZAÇÃO AUTOMÁTICA VIA GITHUB (REPOSITÓRIO PRIVADO) --- */
-async function loadDataFromGithub() {
-  let token = GITHUB_TOKEN;
+/* --- 🔑 GERENCIAMENTO DE TOKEN (PERSISTÊNCIA LOCAL) --- */
+function getGithubToken() {
+  let token = localStorage.getItem('gh_token') || GITHUB_TOKEN;
 
-  // Solicita o token Personal Access Token se não estiver salvo no arquivo
-  if (!token || token === 'COLE_SEU_TOKEN_GHP_AQUI') {
-    token = prompt("Seu repositório é privado. Insira seu Personal Access Token do GitHub para ler os dados:");
-    if (!token) {
-      updateSyncStatus('error', 'Token não fornecido');
-      return;
+  if (!token || token === 'COLE_SEU_TOKEN_GHP_AQUI' || token.trim() === '') {
+    token = prompt("Seu repositório é privado. Insira seu Personal Access Token do GitHub:");
+    if (token && token.trim() !== '') {
+      token = token.trim();
+      localStorage.setItem('gh_token', token);
+    } else {
+      return null;
     }
+  }
+  return token;
+}
+
+function clearGithubToken() {
+  localStorage.removeItem('gh_token');
+  alert('Token do GitHub removido da memória do navegador.');
+}
+
+/* --- 🔑 SINCRONIZAÇÃO AUTOMÁTICA VIA GITHUB --- */
+async function loadDataFromGithub() {
+  const token = getGithubToken();
+  if (!token) {
+    updateSyncStatus('error', 'Token não fornecido');
+    return;
   }
 
   updateSyncStatus('loading', 'Sincronizando dados com o GitHub...');
-  
-  // Utiliza a API do GitHub com autenticação para repositórios privados
   const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
 
   try {
@@ -36,6 +50,12 @@ async function loadDataFromGithub() {
         'Accept': 'application/vnd.github.v3.raw'
       }
     });
+
+    if (response.status === 404) {
+      updateSyncStatus('error', 'Arquivo demandas.json ainda não criado no GitHub');
+      console.warn('O arquivo demandas.json não existe no repositório. Importe o Excel local e clique em "Salvar no GitHub" para criá-lo.');
+      return;
+    }
 
     if (!response.ok) {
       throw new Error(`Erro na conexão (${response.status}: ${response.statusText})`);
@@ -55,12 +75,11 @@ async function loadDataFromGithub() {
     }
 
     if (Array.isArray(jsonRecords) && jsonRecords.length > 0) {
-      // Substitui completamente os dados anteriores
       initData(jsonRecords);
       const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       updateSyncStatus('success', `Atualizado via GitHub (${hora})`);
     } else {
-      throw new Error('Arquivo no GitHub não possui registros válidos.');
+      throw new Error('O arquivo no GitHub não contém registros válidos.');
     }
   } catch (err) {
     console.error("Falha ao sincronizar com GitHub:", err);
@@ -70,32 +89,33 @@ async function loadDataFromGithub() {
 
 /* --- 💾 SALVAR ALTERAÇÕES DIRETAMENTE NO GITHUB --- */
 async function saveToGithub() {
-  let token = GITHUB_TOKEN;
+  const token = getGithubToken();
+  if (!token) {
+    alert("Operação cancelada: Token não fornecido.");
+    return;
+  }
 
-  if (!token || token === 'COLE_SEU_TOKEN_GHP_AQUI') {
-    token = prompt("Insira seu Personal Access Token do GitHub para salvar:");
-    if (!token) {
-      alert("Operação cancelada: Token não fornecido.");
-      return;
-    }
+  if (!window.state.rawData || window.state.rawData.length === 0) {
+    alert("Não há dados na tela para salvar no GitHub. Importe um arquivo local primeiro.");
+    return;
   }
 
   updateSyncStatus('loading', 'Enviando alterações para o GitHub...');
   const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
 
   try {
-    // 1. Obter o SHA do arquivo atual no repositório
+    // 1. Verificar se o arquivo já existe e obter seu SHA
+    let sha = null;
     const getFileResponse = await fetch(apiUrl, {
       headers: { 'Authorization': `token ${token}` }
     });
 
-    let sha = '';
     if (getFileResponse.ok) {
       const fileData = await getFileResponse.json();
       sha = fileData.sha;
     }
 
-    // 2. Limpar metadados e preparar o JSON completo para substituição
+    // 2. Preparar dados
     const cleanData = window.state.rawData.map(row => {
       const copy = { ...row };
       delete copy.__id;
@@ -105,31 +125,37 @@ async function saveToGithub() {
     const jsonString = JSON.stringify(cleanData, null, 2);
     const contentBase64 = btoa(unescape(encodeURIComponent(jsonString)));
 
-    // 3. Enviar requisição PUT para sobrescrever o arquivo no repositório
+    // 3. Montar requisição PUT (sem SHA em arquivos novos)
+    const payload = {
+      message: 'Atualização de dados via Painel SEGES 2026',
+      content: contentBase64
+    };
+
+    if (sha) {
+      payload.sha = sha;
+    }
+
     const putResponse = await fetch(apiUrl, {
       method: 'PUT',
       headers: {
         'Authorization': `token ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        message: 'Atualização realizada via Painel Web SEGES',
-        content: contentBase64,
-        sha: sha
-      })
+      body: JSON.stringify(payload)
     });
 
     if (putResponse.ok) {
       const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       updateSyncStatus('success', `Salvo no GitHub (${hora})`);
-      alert('Dados salvos com sucesso diretamente no seu repositório GitHub!');
+      alert('Arquivo demandas.json foi criado/atualizado com sucesso no repositório!');
     } else {
-      throw new Error(`Erro na API (${putResponse.status})`);
+      const errData = await putResponse.json().catch(() => ({}));
+      throw new Error(`Erro na API (${putResponse.status}): ${errData.message || ''}`);
     }
   } catch (error) {
     console.error('Erro ao salvar no GitHub:', error);
     updateSyncStatus('error', 'Falha ao salvar no GitHub');
-    alert('Erro ao salvar no GitHub. Verifique as permissões do seu token.');
+    alert(`Erro ao salvar no GitHub: ${error.message}`);
   }
 }
 
@@ -221,7 +247,6 @@ function handleFileUpload(event) {
 function initData(jsonRecords) {
   if (!Array.isArray(jsonRecords) || jsonRecords.length === 0) return;
 
-  // Substitui completamente o estado anterior pelos novos dados importados
   window.state.rawData = jsonRecords.map((row, index) => ({
     ...row,
     __id: index,
@@ -460,6 +485,15 @@ function exportToExcel() {
 
   XLSX.writeFile(workbook, `Demandas_SEGES_2026_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
+
+// 🌐 Exportar funções para o escopo global
+window.loadDataFromGithub = loadDataFromGithub;
+window.saveToGithub = saveToGithub;
+window.handleFileUpload = handleFileUpload;
+window.handleFilterChange = handleFilterChange;
+window.resetFilters = resetFilters;
+window.exportToExcel = exportToExcel;
+window.clearGithubToken = clearGithubToken;
 
 /* --- 🚀 INICIALIZAÇÃO NA CARGA DA PÁGINA --- */
 document.addEventListener('DOMContentLoaded', () => {
