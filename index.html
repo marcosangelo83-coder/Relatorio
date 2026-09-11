@@ -35,8 +35,8 @@
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <!-- Botão Recarregar GitHub -->
-        <button onclick="loadDataFromGithub()"
+        <!-- Botão Recarregar GitHub - CORRIGIDO PARA SALVAR -->
+        <button onclick="saveToGithub()"
           class="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-2 border border-blue-200 shadow-sm">
           <i class="fa-solid fa-rotate text-blue-600"></i>
           <span>Atualizar do GitHub</span>
@@ -169,7 +169,8 @@
             </tr>
           </thead>
           <tbody id="syntheticTableBody" class="divide-y divide-gray-200"></tbody>
-          <tfoot id="syntheticTableFooter" class="bg-gray-50 font-bold text-gray-800 border-t-2 border-gray-300"></tfoot>
+          <tfoot id="syntheticTableFooter" class="bg-gray-50 font-bold text-gray-800 border-t-2 border-gray-300">
+          </tfoot>
         </table>
       </div>
     </section>
@@ -199,7 +200,8 @@
             </tr>
           </thead>
           <tbody id="analyticalTableBody" class="divide-y divide-gray-200"></tbody>
-          <tfoot id="analyticalTableFooter" class="bg-gray-50 font-bold text-gray-800 border-t-2 border-gray-300 sticky bottom-0 z-10"></tfoot>
+          <tfoot id="analyticalTableFooter"
+            class="bg-gray-50 font-bold text-gray-800 border-t-2 border-gray-300 sticky bottom-0 z-10"></tfoot>
         </table>
       </div>
     </section>
