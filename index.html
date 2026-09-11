@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Gestão de Demandas - SEGES 2026</title>
+  <!-- Tailwind CSS para estilização (CDN para desenvolvimento/avaliação) -->
+  <!-- Nota: Para produção, compile e use arquivos Tailwind locais. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome para ícones -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- XLSX para suporte a planilhas Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+
+<body class="bg-gray-100 font-sans text-gray-800 antialiased p-4 md:p-8">
+
+  <div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Cabeçalho com Ações Principais -->
+    <header
+      class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <i class="fa-solid fa-chart-pie text-blue-600"></i>
+          Painel de Gestão de Demandas SEGES 2026
+        </h1>
+        <div class="flex flex-wrap items-center gap-3 mt-1">
+          <p class="text-sm text-gray-500">Visão sintética e analítica do planejamento orçamentário e contratações</p>
+          <span id="syncStatus"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+            <i class="fa-solid fa-circle-dot text-gray-400 text-[10px]"></i>
+            Aguardando sincronização
+          </span>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Botão Sincronizar (Salvar no GitHub) -->
+        <button onclick="saveToGithub()"
+          class="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-2 border border-blue-200 shadow-sm">
+          <i class="fa-solid fa-cloud-arrow-up text-blue-600"></i>
+          <span>Salvar no GitHub</span>
+        </button>
+        <!-- Importar Arquivo Local -->
+        <input type="file" id="fileInput" accept=".xlsx, .xls, .csv, .json" class="hidden"
+          onchange="handleFileUpload(event)">
+        <button onclick="document.getElementById('fileInput').click()"
+          class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg transition-colors flex items-center gap-2 border border-gray-300 shadow-sm">
+          <i class="fa-solid fa-file-import text-gray-600"></i>
+          <span>Importar Local</span>
+        </button>
+        <!-- Limpar Filtros -->
+        <button id="btnClearFilters" onclick="resetFilters()"
+          class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-2 border border-gray-300">
+          <i class="fa-solid fa-filter-circle-xmark text-gray-500"></i>
+          Limpar Filtros
+        </button>
+        <!-- Exportar Excel -->
+        <button onclick="exportToExcel()"
+          class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm">
+          <i class="fa-solid fa-file-excel"></i>
+          Exportar Excel
+        </button>
+      </div>
+    </header>
+
+    <!-- Cards de KPIs (Indicadores Chave de Desempenho) -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Registros</p>
+          <h3 id="kpiTotalRecords" class="text-2xl font-bold text-gray-900 mt-1">0</h3>
+        </div>
+        <div class="p-3 bg-blue-50 text-blue-600 rounded-lg">
+          <i class="fa-solid fa-list-check text-xl"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Valor Total Estimado</p>
+          <h3 id="kpiTotalValue" class="text-2xl font-bold text-blue-600 mt-1">R$ 0,00</h3>
+        </div>
+        <div class="p-3 bg-blue-50 text-blue-600 rounded-lg">
+          <i class="fa-solid fa-sack-dollar text-xl"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Despesas de Capital</p>
+          <h3 id="kpiCapitalValue" class="text-2xl font-bold text-purple-600 mt-1">R$ 0,00</h3>
+        </div>
+        <div class="p-3 bg-purple-50 text-purple-600 rounded-lg">
+          <i class="fa-solid fa-building-columns text-xl"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Despesas Correntes</p>
+          <h3 id="kpiCurrentValue" class="text-2xl font-bold text-amber-600 mt-1">R$ 0,00</h3>
+        </div>
+        <div class="p-3 bg-amber-50 text-amber-600 rounded-lg">
+          <i class="fa-solid fa-coins text-xl"></i>
+        </div>
+      </div>
+    </section>
+
+    <!-- Barra de Filtros Dinâmicos -->
+    <section class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-filter text-gray-400"></i> Filtros Ativos
+        </h2>
+        <span id="filterCounter"
+          class="text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">Mostrando todos os dados</span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+          <label for="filterUnidade" class="block text-xs font-medium text-gray-600 mb-1">Unidade</label>
+          <select id="filterUnidade" onchange="handleFilterChange('Unidade', this.value)"
+            class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border">
+            <option value="">Todas as Unidades</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterStatus" class="block text-xs font-medium text-gray-600 mb-1">Status / Orçamento</label>
+          <select id="filterStatus" onchange="handleFilterChange('Status / Orçamento', this.value)"
+            class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border">
+            <option value="">Todos os Status</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterCategoria" class="block text-xs font-medium text-gray-600 mb-1">Categoria Econômica</label>
+          <select id="filterCategoria" onchange="handleFilterChange('Categoria Econômica', this.value)"
+            class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border">
+            <option value="">Todas as Categorias</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterContratacao" class="block text-xs font-medium text-gray-600 mb-1">Contratação</label>
+          <select id="filterContratacao" onchange="handleFilterChange('Contratação', this.value)"
+            class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border">
+            <option value="">Todas as Contratações</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabela Sintética (Resumo) -->
+    <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="p-5 border-b border-gray-200 bg-slate-50 flex items-center justify-between">
+        <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <i class="fa-solid fa-chart-simple text-blue-600"></i>
+          Tabela Sintética (Resumo por Contratação e Categoria Econômica)
+        </h2>
+        <span class="text-xs text-gray-500 font-normal">Consolidado dinâmico</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left text-gray-600">
+          <thead class="text-xs text-gray-700 uppercase bg-gray-100 border-b border-gray-200">
+            <tr>
+              <th scope="col" class="px-4 py-3 font-semibold">Contratação</th>
+              <!-- CORRIGIDO EM image_16.png: Categoria Econômica limpa e fechada -->
+              <th scope="col" class="px-4 py-3 font-semibold">Categoria Econômica</th>
+              <th scope="col" class="px-4 py-3 font-semibold text-center">Qtd. Demandas</th>
+              <th scope="col" class="px-4 py-3 font-semibold text-right">Valor Total Estimado</th>
+              <th scope="col" class="px-4 py-3 font-semibold text-right">% do Total</th>
+            </tr>
+          </thead>
+          <tbody id="syntheticTableBody" class="divide-y divide-gray-200"></tbody>
+          <tfoot id="syntheticTableFooter" class="bg-gray-50 font-bold text-gray-800 border-t-2 border-gray-300">
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- Tabela Analítica (Detalhamento) -->
+    <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden sticky bottom-0 z-10">
+      <div class="p-5 border-b border-gray-200 bg-slate-50 flex items-center justify-between">
+        <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <i class="fa-solid fa-table text-blue-600"></i>
+          Tabela Analítica (Detalhamento das Demandas)
+        </h2>
+      </div>
+      <div class="overflow-x-auto max-h-[550px] overflow-y-auto">
+        <table class="w-full text-sm text-left text-gray-600">
+          <thead class="text-xs text-gray-700 uppercase bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
+            <tr>
+              <th scope="col" class="px-4 py-3 font-semibold">Ano</th>
+              <th scope="col" class="px-4 py-3 font-semibold">Unidade</th>
+              <th scope="col" class="px-4 py-3 font-semibold">Área</th>
+              <th scope="col" class="px-4 py-3 font-semibold">Status / Orçamento</th>
+              <th scope="col" class="px-4 py-3 font-semibold text-right">Valor Estimado</th>
+              <th scope="col" class="px-4 py-3 font-semibold">Cód. Demanda</th>
+              <th scope="col" class="px-4 py-3 font-semibold">Objeto / Sistema</th>
+              <th scope="col" class="px-4 py-3 font-semibold">Categoria Econômica</th>
+              <th scope="col" class="px-4 py-3 font-semibold">Contratação</th>
+              <th scope="col" class="px-4 py-3 font-semibold">Item do Contrato</th>
+            </tr>
+          </thead>
+          <tbody id="analyticalTableBody" class="divide-y divide-gray-200"></tbody>
+          <tfoot id="analyticalTableFooter"
+            class="bg-gray-50 font-bold text-gray-800 border-t-2 border-gray-300 sticky bottom-0 z-10"></tfoot>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Vinculando o arquivo de script separado (script.js) -->
+  <script src="script.js"></script>
+
+</body>
+
+</html>
