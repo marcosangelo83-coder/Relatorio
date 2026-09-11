@@ -602,4 +602,4 @@ window.clearGithubToken = clearGithubToken;
 document.addEventListener('DOMContentLoaded', () => {
   // Executa o PULL inicial do GitHub para preencher o painel
   loadDataFromGithub();
-});
+});```
