@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Gestão de Demandas - SEGES 2026</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- XLSX -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+
+<body class="bg-gray-100 font-sans text-gray-800 antialiased p-4 md:p-8">
+
+  <div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Cabeçalho Principal -->
+    <header
+      class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <i class="fa-solid fa-chart-pie text-blue-600"></i>
+          Painel de Gestão de Demandas SEGES 2026
+        </h1>
+        <p class="text-sm text-gray-500 mt-1">Visão sintética e analítica do planejamento orçamentário e contratações</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Limpar Filtros -->
+        <button id="btnClearFilters" onclick="resetFilters()"
+          class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-2 border border-gray-300">
+          <i class="fa-solid fa-filter-circle-xmark text-gray-500"></i>
+          Limpar Filtros
+        </button>
+        <!-- Exportar Excel -->
+        <button onclick="exportToExcel()"
+          class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm">
+          <i class="fa-solid fa-file-excel"></i>
+          Exportar Excel
+        </button>
+      </div>
+    </header>
+
+    <!-- Cards de KPIs -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Registros</p>
+          <h3 id="kpiTotalRecords" class="text-2xl font-bold text-gray-900 mt-1"></h3>
+        </div>
+        <div class="p-3 bg-blue-50 text-blue-600 rounded-lg">
+          <i class="fa-solid fa-list-check text-xl"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Valor Total Estimado</p>
+          <h3 id="kpiTotalValue" class="text-2xl font-bold text-blue-600 mt-1"></h3>
+        </div>
+        <div class="p-3 bg-blue-50 text-blue-600 rounded-lg">
+          <i class="fa-solid fa-sack-dollar text-xl"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Despesas de Capital</p>
+          <h3 id="kpiCapitalValue" class="text-2xl font-bold text-purple-600 mt-1"></h3>
+        </div>
+        <div class="p-3 bg-purple-50 text-purple-600 rounded-lg">
+          <i class="fa-solid fa-building-columns text-xl"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Despesas Correntes</p>
+          <h3 id="kpiCurrentValue" class="text-2xl font-bold text-amber-600 mt-1"></h3>
+        </div>
+        <div class="p-3 bg-amber-50 text-amber-600 rounded-lg">
+          <i class="fa-solid fa-coins text-xl"></i>
+        </div>
+      </div>
+    </section>
+
+    <!-- Barra de Filtros Principais (Com Busca por Lupa e Multi-Seleção) -->
+    <section class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+      <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+        <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-filter text-blue-600"></i> Filtros de Busca e Seleção
+        </h2>
+        <span id="filterCounter" class="text-xs font-medium"></span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <!-- Dropdown Unidade -->
+        <div class="relative filter-dropdown-container">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Unidade</label>
+          <button id="btnDropdownUnidade" type="button" onclick="toggleDropdown('Unidade')"
+            class="w-full text-left text-xs border border-gray-300 rounded-lg bg-gray-50 p-2 flex justify-between items-center hover:bg-gray-100 transition-colors">
+            <span id="labelUnidade" class="truncate text-gray-700 font-medium">Todas as Unidades</span>
+            <i class="fa-solid fa-chevron-down text-[10px] text-gray-400 ml-1"></i>
+          </button>
+          <div id="menuUnidade" class="hidden absolute z-30 mt-1 w-full min-w-[200px] bg-white border border-gray-200 rounded-lg shadow-lg p-2.5 text-xs">
+            <div class="mb-2 relative">
+              <input type="text" id="searchUnidade" onkeyup="filterDropdownOptions('Unidade')" placeholder="Buscar Unidade..."
+                class="w-full pl-7 pr-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:outline-none">
+              <i class="fa-solid fa-magnifying-glass absolute left-2 top-2 text-[10px] text-gray-400"></i>
+            </div>
+            <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-gray-100 text-[11px] text-blue-600 font-medium">
+              <button type="button" onclick="selectAllOptions('Unidade')" class="hover:underline">Marcar Todos</button>
+              <button type="button" onclick="deselectAllOptions('Unidade')" class="hover:underline text-gray-500">Desmarcar Todos</button>
+            </div>
+            <div id="optionsUnidade" class="max-h-40 overflow-y-auto space-y-1"></div>
+          </div>
+        </div>
+
+        <!-- Dropdown Área -->
+        <div class="relative filter-dropdown-container">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Área</label>
+          <button id="btnDropdownArea" type="button" onclick="toggleDropdown('Area')"
+            class="w-full text-left text-xs border border-gray-300 rounded-lg bg-gray-50 p-2 flex justify-between items-center hover:bg-gray-100 transition-colors">
+            <span id="labelArea" class="truncate text-gray-700 font-medium">Todas as Áreas</span>
+            <i class="fa-solid fa-chevron-down text-[10px] text-gray-400 ml-1"></i>
+          </button>
+          <div id="menuArea" class="hidden absolute z-30 mt-1 w-full min-w-[200px] bg-white border border-gray-200 rounded-lg shadow-lg p-2.5 text-xs">
+            <div class="mb-2 relative">
+              <input type="text" id="searchArea" onkeyup="filterDropdownOptions('Area')" placeholder="Buscar Área..."
+                class="w-full pl-7 pr-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:outline-none">
+              <i class="fa-solid fa-magnifying-glass absolute left-2 top-2 text-[10px] text-gray-400"></i>
+            </div>
+            <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-gray-100 text-[11px] text-blue-600 font-medium">
+              <button type="button" onclick="selectAllOptions('Area')" class="hover:underline">Marcar Todos</button>
+              <button type="button" onclick="deselectAllOptions('Area')" class="hover:underline text-gray-500">Desmarcar Todos</button>
+            </div>
+            <div id="optionsArea" class="max-h-40 overflow-y-auto space-y-1"></div>
+          </div>
+        </div>
+
+        <!-- Dropdown Status / Orçamento -->
+        <div class="relative filter-dropdown-container">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Status / Orçamento</label>
+          <button id="btnDropdownStatus" type="button" onclick="toggleDropdown('Status')"
+            class="w-full text-left text-xs border border-gray-300 rounded-lg bg-gray-50 p-2 flex justify-between items-center hover:bg-gray-100 transition-colors">
+            <span id="labelStatus" class="truncate text-gray-700 font-medium">Todos os Status</span>
+            <i class="fa-solid fa-chevron-down text-[10px] text-gray-400 ml-1"></i>
+          </button>
+          <div id="menuStatus" class="hidden absolute z-30 mt-1 w-full min-w-[200px] bg-white border border-gray-200 rounded-lg shadow-lg p-2.5 text-xs">
+            <div class="mb-2 relative">
+              <input type="text" id="searchStatus" onkeyup="filterDropdownOptions('Status')" placeholder="Buscar Status..."
+                class="w-full pl-7 pr-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:outline-none">
+              <i class="fa-solid fa-magnifying-glass absolute left-2 top-2 text-[10px] text-gray-400"></i>
+            </div>
+            <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-gray-100 text-[11px] text-blue-600 font-medium">
+              <button type="button" onclick="selectAllOptions('Status')" class="hover:underline">Marcar Todos</button>
+              <button type="button" onclick="deselectAllOptions('Status')" class="hover:underline text-gray-500">Desmarcar Todos</button>
+            </div>
+            <div id="optionsStatus" class="max-h-40 overflow-y-auto space-y-1"></div>
+          </div>
+        </div>
+
+        <!-- Dropdown Categoria Econômica -->
+        <div class="relative filter-dropdown-container">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Categoria Econômica</label>
+          <button id="btnDropdownCategoria" type="button" onclick="toggleDropdown('Categoria')"
+            class="w-full text-left text-xs border border-gray-300 rounded-lg bg-gray-50 p-2 flex justify-between items-center hover:bg-gray-100 transition-colors">
+            <span id="labelCategoria" class="truncate text-gray-700 font-medium">Todas as Categorias</span>
+            <i class="fa-solid fa-chevron-down text-[10px] text-gray-400 ml-1"></i>
+          </button>
+          <div id="menuCategoria" class="hidden absolute z-30 mt-1 w-full min-w-[200px] bg-white border border-gray-200 rounded-lg shadow-lg p-2.5 text-xs">
+            <div class="mb-2 relative">
+              <input type="text" id="searchCategoria" onkeyup="filterDropdownOptions('Categoria')" placeholder="Buscar Categoria..."
+                class="w-full pl-7 pr-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:outline-none">
+              <i class="fa-solid fa-magnifying-glass absolute left-2 top-2 text-[10px] text-gray-400"></i>
+            </div>
+            <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-gray-100 text-[11px] text-blue-600 font-medium">
+              <button type="button" onclick="selectAllOptions('Categoria')" class="hover:underline">Marcar Todos</button>
+              <button type="button" onclick="deselectAllOptions('Categoria')" class="hover:underline text-gray-500">Desmarcar Todos</button>
+            </div>
+            <div id="optionsCategoria" class="max-h-40 overflow-y-auto space-y-1"></div>
+          </div>
+        </div>
+
+        <!-- Dropdown Contratação -->
+        <div class="relative filter-dropdown-container">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Contratação</label>
+          <button id="btnDropdownContratacao" type="button" onclick="toggleDropdown('Contratacao')"
+            class="w-full text-left text-xs border border-gray-300 rounded-lg bg-gray-50 p-2 flex justify-between items-center hover:bg-gray-100 transition-colors">
+            <span id="labelContratacao" class="truncate text-gray-700 font-medium">Todas as Contratações</span>
+            <i class="fa-solid fa-chevron-down text-[10px] text-gray-400 ml-1"></i>
+          </button>
+          <div id="menuContratacao" class="hidden absolute z-30 mt-1 w-full min-w-[200px] bg-white border border-gray-200 rounded-lg shadow-lg p-2.5 text-xs">
+            <div class="mb-2 relative">
+              <input type="text" id="searchContratacao" onkeyup="filterDropdownOptions('Contratacao')" placeholder="Buscar Contratação..."
+                class="w-full pl-7 pr-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:outline-none">
+              <i class="fa-solid fa-magnifying-glass absolute left-2 top-2 text-[10px] text-gray-400"></i>
+            </div>
+            <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-gray-100 text-[11px] text-blue-600 font-medium">
+              <button type="button" onclick="selectAllOptions('Contratacao')" class="hover:underline">Marcar Todos</button>
+              <button type="button" onclick="deselectAllOptions('Contratacao')" class="hover:underline text-gray-500">Desmarcar Todos</button>
+            </div>
+            <div id="optionsContratacao" class="max-h-40 overflow-y-auto space-y-1"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabela Sintética -->
+    <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="p-5 border-b border-gray-200 bg-slate-50 flex items-center justify-between">
+        <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <i class="fa-solid fa-chart-simple text-blue-600"></i>
+          Tabela Sintética (Resumo por Contratação e Categoria Econômica)
+        </h2>
+        <span class="text-xs text-gray-500 font-normal">Consolidado com subtotais por categoria</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left text-gray-600">
+          <thead class="text-xs text-gray-700 uppercase bg-gray-100 border-b border-gray-200">
+            <tr>
+              <th scope="col" class="px-4 py-3 font-semibold">Contratação</th>
+              <th scope="col" class="px-4 py-3 font-semibold">Categoria Econômica</th>
+              <th scope="col" class="px-4 py-3 font-semibold">Item do Contrato</th>
+              <th scope="col" class="px-4 py-3 font-semibold text-center">Qtd. Demandas</th>
+              <th scope="col" class="px-4 py-3 font-semibold text-right">Valor Total Estimado</th>
+              <th scope="col" class="px-4 py-3 font-semibold text-right">% do Total</th>
+            </tr>
+          </thead>
+          <tbody id="syntheticTableBody" class="divide-y divide-gray-200"></tbody>
+          <tfoot id="syntheticTableFooter" class="bg-gray-50 font-bold text-gray-800 border-t-2 border-gray-300"></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- Tabela Analítica (Com Filtros no Cabeçalho de Cada Coluna) -->
+    <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="p-5 border-b border-gray-200 bg-slate-50 flex items-center justify-between">
+        <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <i class="fa-solid fa-table text-blue-600"></i>
+          Tabela Analítica (Detalhamento das Demandas)
+        </h2>
+      </div>
+      <div class="overflow-x-auto max-h-[550px] overflow-y-auto">
+        <table class="w-full text-sm text-left text-gray-600">
+          <thead class="text-xs text-gray-700 uppercase bg-gray-100 border-b border-gray-200 sticky top-0 z-20">
+            <tr>
+              <!-- Coluna Ano -->
+              <th scope="col" class="px-3 py-3 font-semibold relative">
+                <div class="flex items-center justify-between gap-1">
+                  <span>Ano</span>
+                  <button type="button" onclick="toggleHeaderFilter('Ano', event)" class="text-gray-400 hover:text-blue-600 focus:outline-none">
+                    <i class="fa-solid fa-filter text-[10px]"></i>
+                  </button>
+                </div>
+                <div id="colFilter_Ano" class="hidden absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl p-2 font-normal normal-case text-gray-800 z-30">
+                  <div class="mb-1.5 relative">
+                    <input type="text" id="colSearch_Ano" onkeyup="filterColOptions('Ano')" placeholder="Buscar..." class="w-full pl-6 pr-1.5 py-0.5 text-xs border border-gray-300 rounded">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2 top-1.5 text-[9px] text-gray-400"></i>
+                  </div>
+                  <div class="flex items-center justify-between pb-1 mb-1 border-b text-[10px] text-blue-600">
+                    <button type="button" onclick="selectAllCol('Ano')">Todos</button>
+                    <button type="button" onclick="deselectAllCol('Ano')" class="text-gray-500">Nenhum</button>
+                  </div>
+                  <div id="colList_Ano" class="max-h-36 overflow-y-auto space-y-1 text-xs"></div>
+                </div>
+              </th>
+
+              <!-- Coluna Unidade -->
+              <th scope="col" class="px-3 py-3 font-semibold relative">
+                <div class="flex items-center justify-between gap-1">
+                  <span>Unidade</span>
+                  <button type="button" onclick="toggleHeaderFilter('UnidadeCol', event)" class="text-gray-400 hover:text-blue-600 focus:outline-none">
+                    <i class="fa-solid fa-filter text-[10px]"></i>
+                  </button>
+                </div>
+                <div id="colFilter_UnidadeCol" class="hidden absolute left-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-xl p-2 font-normal normal-case text-gray-800 z-30">
+                  <div class="mb-1.5 relative">
+                    <input type="text" id="colSearch_UnidadeCol" onkeyup="filterColOptions('UnidadeCol')" placeholder="Buscar..." class="w-full pl-6 pr-1.5 py-0.5 text-xs border border-gray-300 rounded">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2 top-1.5 text-[9px] text-gray-400"></i>
+                  </div>
+                  <div class="flex items-center justify-between pb-1 mb-1 border-b text-[10px] text-blue-600">
+                    <button type="button" onclick="selectAllCol('UnidadeCol')">Todos</button>
+                    <button type="button" onclick="deselectAllCol('UnidadeCol')" class="text-gray-500">Nenhum</button>
+                  </div>
+                  <div id="colList_UnidadeCol" class="max-h-36 overflow-y-auto space-y-1 text-xs"></div>
+                </div>
+              </th>
+
+              <!-- Coluna Área -->
+              <th scope="col" class="px-3 py-3 font-semibold relative">
+                <div class="flex items-center justify-between gap-1">
+                  <span>Área</span>
+                  <button type="button" onclick="toggleHeaderFilter('AreaCol', event)" class="text-gray-400 hover:text-blue-600 focus:outline-none">
+                    <i class="fa-solid fa-filter text-[10px]"></i>
+                  </button>
+                </div>
+                <div id="colFilter_AreaCol" class="hidden absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl p-2 font-normal normal-case text-gray-800 z-30">
+                  <div class="mb-1.5 relative">
+                    <input type="text" id="colSearch_AreaCol" onkeyup="filterColOptions('AreaCol')" placeholder="Buscar..." class="w-full pl-6 pr-1.5 py-0.5 text-xs border border-gray-300 rounded">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2 top-1.5 text-[9px] text-gray-400"></i>
+                  </div>
+                  <div class="flex items-center justify-between pb-1 mb-1 border-b text-[10px] text-blue-600">
+                    <button type="button" onclick="selectAllCol('AreaCol')">Todos</button>
+                    <button type="button" onclick="deselectAllCol('AreaCol')" class="text-gray-500">Nenhum</button>
+                  </div>
+                  <div id="colList_AreaCol" class="max-h-36 overflow-y-auto space-y-1 text-xs"></div>
+                </div>
+              </th>
+
+              <!-- Coluna Status / Orçamento -->
+              <th scope="col" class="px-3 py-3 font-semibold relative">
+                <div class="flex items-center justify-between gap-1">
+                  <span>Status / Orçamento</span>
+                  <button type="button" onclick="toggleHeaderFilter('StatusCol', event)" class="text-gray-400 hover:text-blue-600 focus:outline-none">
+                    <i class="fa-solid fa-filter text-[10px]"></i>
+                  </button>
+                </div>
+                <div id="colFilter_StatusCol" class="hidden absolute left-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-xl p-2 font-normal normal-case text-gray-800 z-30">
+                  <div class="mb-1.5 relative">
+                    <input type="text" id="colSearch_StatusCol" onkeyup="filterColOptions('StatusCol')" placeholder="Buscar..." class="w-full pl-6 pr-1.5 py-0.5 text-xs border border-gray-300 rounded">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2 top-1.5 text-[9px] text-gray-400"></i>
+                  </div>
+                  <div class="flex items-center justify-between pb-1 mb-1 border-b text-[10px] text-blue-600">
+                    <button type="button" onclick="selectAllCol('StatusCol')">Todos</button>
+                    <button type="button" onclick="deselectAllCol('StatusCol')" class="text-gray-500">Nenhum</button>
+                  </div>
+                  <div id="colList_StatusCol" class="max-h-36 overflow-y-auto space-y-1 text-xs"></div>
+                </div>
+              </th>
+
+              <!-- Coluna Valor Estimado -->
+              <th scope="col" class="px-3 py-3 font-semibold text-right">Valor Estimado</th>
+
+              <!-- Coluna Cód. Demanda -->
+              <th scope="col" class="px-3 py-3 font-semibold relative">
+                <div class="flex items-center justify-between gap-1">
+                  <span>Cód. Demanda</span>
+                  <button type="button" onclick="toggleHeaderFilter('CodDemanda', event)" class="text-gray-400 hover:text-blue-600 focus:outline-none">
+                    <i class="fa-solid fa-filter text-[10px]"></i>
+                  </button>
+                </div>
+                <div id="colFilter_CodDemanda" class="hidden absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl p-2 font-normal normal-case text-gray-800 z-30">
+                  <div class="mb-1.5 relative">
+                    <input type="text" id="colSearch_CodDemanda" onkeyup="filterColOptions('CodDemanda')" placeholder="Buscar..." class="w-full pl-6 pr-1.5 py-0.5 text-xs border border-gray-300 rounded">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2 top-1.5 text-[9px] text-gray-400"></i>
+                  </div>
+                  <div class="flex items-center justify-between pb-1 mb-1 border-b text-[10px] text-blue-600">
+                    <button type="button" onclick="selectAllCol('CodDemanda')">Todos</button>
+                    <button type="button" onclick="deselectAllCol('CodDemanda')" class="text-gray-500">Nenhum</button>
+                  </div>
+                  <div id="colList_CodDemanda" class="max-h-36 overflow-y-auto space-y-1 text-xs"></div>
+                </div>
+              </th>
+
+              <!-- Coluna Objeto / Sistema -->
+              <th scope="col" class="px-3 py-3 font-semibold relative">
+                <div class="flex items-center justify-between gap-1">
+                  <span>Objeto / Sistema</span>
+                  <button type="button" onclick="toggleHeaderFilter('Objeto', event)" class="text-gray-400 hover:text-blue-600 focus:outline-none">
+                    <i class="fa-solid fa-filter text-[10px]"></i>
+                  </button>
+                </div>
+                <div id="colFilter_Objeto" class="hidden absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-xl p-2 font-normal normal-case text-gray-800 z-30">
+                  <div class="mb-1.5 relative">
+                    <input type="text" id="colSearch_Objeto" onkeyup="filterColOptions('Objeto')" placeholder="Buscar..." class="w-full pl-6 pr-1.5 py-0.5 text-xs border border-gray-300 rounded">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2 top-1.5 text-[9px] text-gray-400"></i>
+                  </div>
+                  <div class="flex items-center justify-between pb-1 mb-1 border-b text-[10px] text-blue-600">
+                    <button type="button" onclick="selectAllCol('Objeto')">Todos</button>
+                    <button type="button" onclick="deselectAllCol('Objeto')" class="text-gray-500">Nenhum</button>
+                  </div>
+                  <div id="colList_Objeto" class="max-h-36 overflow-y-auto space-y-1 text-xs"></div>
+                </div>
+              </th>
+
+              <!-- Coluna Categoria Econômica -->
+              <th scope="col" class="px-3 py-3 font-semibold relative">
+                <div class="flex items-center justify-between gap-1">
+                  <span>Categoria Econômica</span>
+                  <button type="button" onclick="toggleHeaderFilter('CategoriaCol', event)" class="text-gray-400 hover:text-blue-600 focus:outline-none">
+                    <i class="fa-solid fa-filter text-[10px]"></i>
+                  </button>
+                </div>
+                <div id="colFilter_CategoriaCol" class="hidden absolute left-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-xl p-2 font-normal normal-case text-gray-800 z-30">
+                  <div class="mb-1.5 relative">
+                    <input type="text" id="colSearch_CategoriaCol" onkeyup="filterColOptions('CategoriaCol')" placeholder="Buscar..." class="w-full pl-6 pr-1.5 py-0.5 text-xs border border-gray-300 rounded">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2 top-1.5 text-[9px] text-gray-400"></i>
+                  </div>
+                  <div class="flex items-center justify-between pb-1 mb-1 border-b text-[10px] text-blue-600">
+                    <button type="button" onclick="selectAllCol('CategoriaCol')">Todos</button>
+                    <button type="button" onclick="deselectAllCol('CategoriaCol')" class="text-gray-500">Nenhum</button>
+                  </div>
+                  <div id="colList_CategoriaCol" class="max-h-36 overflow-y-auto space-y-1 text-xs"></div>
+                </div>
+              </th>
+
+              <!-- Coluna Contratação -->
+              <th scope="col" class="px-3 py-3 font-semibold relative">
+                <div class="flex items-center justify-between gap-1">
+                  <span>Contratação</span>
+                  <button type="button" onclick="toggleHeaderFilter('ContratacaoCol', event)" class="text-gray-400 hover:text-blue-600 focus:outline-none">
+                    <i class="fa-solid fa-filter text-[10px]"></i>
+                  </button>
+                </div>
+                <div id="colFilter_ContratacaoCol" class="hidden absolute left-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-xl p-2 font-normal normal-case text-gray-800 z-30">
+                  <div class="mb-1.5 relative">
+                    <input type="text" id="colSearch_ContratacaoCol" onkeyup="filterColOptions('ContratacaoCol')" placeholder="Buscar..." class="w-full pl-6 pr-1.5 py-0.5 text-xs border border-gray-300 rounded">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2 top-1.5 text-[9px] text-gray-400"></i>
+                  </div>
+                  <div class="flex items-center justify-between pb-1 mb-1 border-b text-[10px] text-blue-600">
+                    <button type="button" onclick="selectAllCol('ContratacaoCol')">Todos</button>
+                    <button type="button" onclick="deselectAllCol('ContratacaoCol')" class="text-gray-500">Nenhum</button>
+                  </div>
+                  <div id="colList_ContratacaoCol" class="max-h-36 overflow-y-auto space-y-1 text-xs"></div>
+                </div>
+              </th>
+
+              <!-- Coluna Item do Contrato -->
+              <th scope="col" class="px-3 py-3 font-semibold relative">
+                <div class="flex items-center justify-between gap-1">
+                  <span>Item do Contrato</span>
+                  <button type="button" onclick="toggleHeaderFilter('ItemContrato', event)" class="text-gray-400 hover:text-blue-600 focus:outline-none">
+                    <i class="fa-solid fa-filter text-[10px]"></i>
+                  </button>
+                </div>
+                <div id="colFilter_ItemContrato" class="hidden absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl p-2 font-normal normal-case text-gray-800 z-30">
+                  <div class="mb-1.5 relative">
+                    <input type="text" id="colSearch_ItemContrato" onkeyup="filterColOptions('ItemContrato')" placeholder="Buscar..." class="w-full pl-6 pr-1.5 py-0.5 text-xs border border-gray-300 rounded">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2 top-1.5 text-[9px] text-gray-400"></i>
+                  </div>
+                  <div class="flex items-center justify-between pb-1 mb-1 border-b text-[10px] text-blue-600">
+                    <button type="button" onclick="selectAllCol('ItemContrato')">Todos</button>
+                    <button type="button" onclick="deselectAllCol('ItemContrato')" class="text-gray-500">Nenhum</button>
+                  </div>
+                  <div id="colList_ItemContrato" class="max-h-36 overflow-y-auto space-y-1 text-xs"></div>
+                </div>
+              </th>
+
+              <!-- Coluna Nº Empenho -->
+              <th scope="col" class="px-3 py-3 font-semibold relative">
+                <div class="flex items-center justify-between gap-1">
+                  <span>Nº Empenho</span>
+                  <button type="button" onclick="toggleHeaderFilter('Empenho', event)" class="text-gray-400 hover:text-blue-600 focus:outline-none">
+                    <i class="fa-solid fa-filter text-[10px]"></i>
+                  </button>
+                </div>
+                <div id="colFilter_Empenho" class="hidden absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl p-2 font-normal normal-case text-gray-800 z-30">
+                  <div class="mb-1.5 relative">
+                    <input type="text" id="colSearch_Empenho" onkeyup="filterColOptions('Empenho')" placeholder="Buscar..." class="w-full pl-6 pr-1.5 py-0.5 text-xs border border-gray-300 rounded">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2 top-1.5 text-[9px] text-gray-400"></i>
+                  </div>
+                  <div class="flex items-center justify-between pb-1 mb-1 border-b text-[10px] text-blue-600">
+                    <button type="button" onclick="selectAllCol('Empenho')">Todos</button>
+                    <button type="button" onclick="deselectAllCol('Empenho')" class="text-gray-500">Nenhum</button>
+                  </div>
+                  <div id="colList_Empenho" class="max-h-36 overflow-y-auto space-y-1 text-xs"></div>
+                </div>
+              </th>
+
+              <!-- Coluna Ordem de Serviço -->
+              <th scope="col" class="px-3 py-3 font-semibold relative">
+                <div class="flex items-center justify-between gap-1">
+                  <span>Ordem de Serviço</span>
+                  <button type="button" onclick="toggleHeaderFilter('OrdemServico', event)" class="text-gray-400 hover:text-blue-600 focus:outline-none">
+                    <i class="fa-solid fa-filter text-[10px]"></i>
+                  </button>
+                </div>
+                <div id="colFilter_OrdemServico" class="hidden absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl p-2 font-normal normal-case text-gray-800 z-30">
+                  <div class="mb-1.5 relative">
+                    <input type="text" id="colSearch_OrdemServico" onkeyup="filterColOptions('OrdemServico')" placeholder="Buscar..." class="w-full pl-6 pr-1.5 py-0.5 text-xs border border-gray-300 rounded">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2 top-1.5 text-[9px] text-gray-400"></i>
+                  </div>
+                  <div class="flex items-center justify-between pb-1 mb-1 border-b text-[10px] text-blue-600">
+                    <button type="button" onclick="selectAllCol('OrdemServico')">Todos</button>
+                    <button type="button" onclick="deselectAllCol('OrdemServico')" class="text-gray-500">Nenhum</button>
+                  </div>
+                  <div id="colList_OrdemServico" class="max-h-36 overflow-y-auto space-y-1 text-xs"></div>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="analyticalTableBody" class="divide-y divide-gray-200"></tbody>
+          <tfoot id="analyticalTableFooter" class="bg-gray-50 font-bold text-gray-800 border-t-2 border-gray-300 sticky bottom-0 z-10"></tfoot>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="script.js"></script>
+
+</body>
+
+</html>
