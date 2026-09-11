@@ -51,7 +51,7 @@ async function loadDataFromGithub() {
 
   try {
     const response = await fetch(apiUrl, {
-      headers: { 
+      headers: {
         'Authorization': `token ${token}`,
         // Pede o conteúdo bruto do arquivo (raw) para evitar parsing de Base64 manual aqui
         'Accept': 'application/vnd.github.v3.raw'
@@ -61,7 +61,7 @@ async function loadDataFromGithub() {
     // Trata erro 404 (Arquivo não existe) amigavelmente
     if (response.status === 404) {
       updateSyncStatus('error', 'Arquivo demandas.json ainda não criado no GitHub');
-      console.warn('O arquivo demandas.json não existe no repositório. Importe o Excel local e clique em "Atualizar do GitHub" para criá-lo.');
+      console.warn('O arquivo demandas.json não existe no repositório. Importe o Excel local e clique em "Salvar no GitHub" para criá-lo.');
       return;
     }
 
@@ -98,7 +98,7 @@ async function loadDataFromGithub() {
 }
 
 /* --- 💾 SALVAR ALTERAÇÕES NO GITHUB (PUSH) --- */
-// Função vinculada ao botão "Atualizar do GitHub" no HTML.
+// Função vinculada ao botão "Sincronizar" (no HTML como "Atualizar do GitHub")
 // Ela envia o estado da TELA para a nuvem, SEM alterar a tela.
 async function saveToGithub() {
   const token = getGithubToken();
@@ -117,19 +117,30 @@ async function saveToGithub() {
   const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
 
   try {
-    // 1. Obter o SHA do arquivo atual (Necessário para PUT de atualização em repositórios Git)
-    // Fazemos uma chamada GET separada para pegar os metadados (incluindo o SHA)
+    // 1. Verificar se o arquivo já existe e obter seu SHA
+    // Lógica CORRIGIDA: Trata explicitamente o status 404 Not Found
     let sha = null;
-    const getFileResponse = await fetch(apiUrl, {
-      headers: { 'Authorization': `token ${token}` }
-      // Nota: Não usamos Accept raw aqui, queremos o JSON de metadados da API
-    });
-
-    if (getFileResponse.ok) {
-      const fileData = await getFileResponse.json();
-      sha = fileData.sha; // Guarda o SHA do arquivo existente
+    let fileResponse;
+    try {
+      fileResponse = await fetch(apiUrl, {
+        headers: { 'Authorization': `token ${token}` }
+      });
+    } catch (fetchError) {
+      throw new Error(`Erro ao buscar metadados do arquivo: ${fetchError.message}`);
     }
-    // Se der 404 aqui, sha continua null, e o PUT criará um novo arquivo.
+
+    if (fileResponse.ok) {
+      // Arquivo existe -> Pega o SHA para atualização (update)
+      const fileData = await fileResponse.json();
+      sha = fileData.sha;
+    } else if (fileResponse.status === 404) {
+      // Arquivo não existe -> Trata como criação de novo arquivo (create)
+      sha = null; // Já é null, mas deixa explícito
+    } else {
+      // Outro erro de API (403, 401, 500, etc.) -> Não podemos prosseguir com PUT
+      const errData = await fileResponse.json().catch(() => ({}));
+      throw new Error(`Erro ao verificar existência do arquivo (${fileResponse.status}): ${errData.message || ''}`);
+    }
 
     // 2. Preparar e Limpar dados para envio
     // Removemos o '__id' temporário que a função initData adiciona para controle interno da tabela
@@ -150,7 +161,7 @@ async function saveToGithub() {
       content: contentBase64
     };
 
-    // Se o arquivo já existia, precisamos incluir o SHA para confirmar a sobrescrita
+    // Se o arquivo já existia (sha não é null), precisamos incluir o SHA para confirmar a sobrescrita
     if (sha) {
       payload.sha = sha;
     }
@@ -259,18 +270,16 @@ function handleFileUpload(event) {
         const jsonRecords = XLSX.utils.sheet_to_json(worksheet);
 
         if (jsonRecords && jsonRecords.length > 0) {
-          initData(jsonRecords); // Atualiza a TELA (window.state)
+          initData(jsonRecords);
           const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
           updateSyncStatus('idle', `Importado local: ${file.name} (${hora})`);
-          // Avisa o usuário que precisa salvar
-          console.info('Dados importados localmente. Clique em "Atualizar do GitHub" para salvar permanentemente na nuvem.');
         } else {
-          alert("O arquivo selecionado não contém dados válidos na primeira planilha.");
+          alert("O arquivo selecionado não contém dados válidos.");
           updateSyncStatus('error', 'Arquivo sem dados');
         }
       } catch (err) {
-        console.error("Erro ao ler arquivo Excel:", err);
-        alert("Erro ao ler planilha Excel local. Verifique o formato.");
+        console.error("Erro ao ler arquivo Excel local:", err);
+        alert("Erro ao ler planilha Excel.");
         updateSyncStatus('error', 'Falha na importação');
       }
     };
@@ -545,7 +554,6 @@ function renderAnalyticalTable() {
   // Calcula total analítico visível
   const totalVal = data.reduce((sum, item) => sum + (item['Valor Estimado'] || 0), 0);
 
-  // Renderiza linha de total no rodapé (tfoot)
   tfoot.innerHTML = `
     <tr>
       <td colspan="4" class="px-4 py-3 text-right font-bold text-gray-800">TOTAL ANALÍTICO (${data.length} ITENS):</td>
@@ -583,7 +591,7 @@ function exportToExcel() {
 // 🌐 Exportar funções cruciais para o escopo global (window)
 // Isso é necessário porque o HTML Tailwind usa atributos onclick="funcao()" diretamente
 window.loadDataFromGithub = loadDataFromGithub;
-window.saveToGithub = saveToGithub; // Agora vinculado ao botão "Atualizar do GitHub" no HTML modificado anteriormente
+window.saveToGithub = saveToGithub; // Agora vinculado ao botão "Sincronizar"
 window.handleFileUpload = handleFileUpload;
 window.handleFilterChange = handleFilterChange;
 window.resetFilters = resetFilters;
